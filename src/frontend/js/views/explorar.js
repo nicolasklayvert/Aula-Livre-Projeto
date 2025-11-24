@@ -73,13 +73,18 @@ window.abrirModalAgendamento = function(id) {
                 const modalInstance = bootstrap.Modal.getInstance(modalElemento);
                 modalInstance.hide();
 
-                // 2. atualiza o texto da notificacao
-                const textoNotificacao = document.getElementById('texto-notificacao');
-                textoNotificacao.innerText = `Sucesso! Aula com ${professor.nome} agendada para ${horario}.`;
+                // 2. atualiza o texto da notificacao (IDs novos do index.html)
+                const toastEl = document.getElementById('toast-sistema');
+                const toastMsg = document.getElementById('toast-mensagem');
+                const toastIcone = document.getElementById('toast-icone');
+                
+                // Força visual de sucesso (verde e check)
+                toastEl.className = 'toast align-items-center text-white border-0 bg-success';
+                toastIcone.className = 'bi bi-check-circle-fill me-2';
+                toastMsg.innerText = `Sucesso! Aula com ${professor.nome} agendada para ${horario}.`;
 
                 // 3. mostra o toast (a caixinha verde no canto)
-                const toastElemento = document.getElementById('notificacao-sucesso');
-                const toastBootstrap = new bootstrap.Toast(toastElemento);
+                const toastBootstrap = new bootstrap.Toast(toastEl);
                 toastBootstrap.show();
 
                 // TODO: chamar a api do back pra salvar o agendamento no banco

@@ -1,6 +1,9 @@
 // js/views/home.js
 
-export function obterConteudoHome() {
+import { authService } from '../services/auth.js';
+
+// --- TELA 1: VISITANTE ---
+function renderHomeVisitante() {
     // retorna o htmlzao estatico da home.
     // no futuro se precisar de dados dinamicos (tipo "professores destaque")
     // a gente transforma isso numa funcao async igual a do explorar
@@ -17,7 +20,11 @@ export function obterConteudoHome() {
                             Encontrar Professor
                         </button>
                         
-                        <button type="button" class="btn btn-outline-secondary btn-lg px-4">
+                        <button type="button" 
+                                class="btn btn-outline-secondary btn-lg px-4"
+                                data-bs-toggle="modal" 
+                                data-bs-target="#modal-cadastro"
+                                onclick="document.getElementById('cad-tipo').value='professor'">
                             Sou Professor
                         </button>
                     </div>
@@ -69,4 +76,89 @@ export function obterConteudoHome() {
         </div>
     </section>
     `;
+}
+
+// --- TELA 2: ALUNO LOGADO ---
+function renderHomeAluno(usuario) {
+    return `
+    <div class="container py-5">
+        <div class="row justify-content-center text-center">
+            <div class="col-lg-8">
+                <h1 class="fw-bold text-primary mb-3">Olá, ${usuario.nome.split(' ')[0]}! 👋</h1>
+                <p class="lead text-muted mb-5">O que você quer aprender hoje?</p>
+                
+                <div class="row g-4">
+                    <div class="col-md-6">
+                        <div class="card h-100 border-0 shadow-sm hover-effect p-4" style="cursor: pointer;" data-route="explorar">
+                            <div class="card-body">
+                                <div class="bg-light p-3 rounded-circle d-inline-block mb-3 text-primary">
+                                    <i class="bi bi-search fs-1"></i>
+                                </div>
+                                <h4 class="fw-bold">Buscar Aulas</h4>
+                                <p class="text-muted small">Encontre professores de Matemática, Inglês e mais.</p>
+                                <button class="btn btn-outline-primary w-100 mt-2">Ir para Busca</button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <div class="card h-100 border-0 shadow-sm hover-effect p-4" style="cursor: pointer;" data-route="dashboard">
+                            <div class="card-body">
+                                <div class="bg-light p-3 rounded-circle d-inline-block mb-3 text-success">
+                                    <i class="bi bi-journal-check fs-1"></i>
+                                </div>
+                                <h4 class="fw-bold">Meu Painel</h4>
+                                <p class="text-muted small">Veja suas próximas aulas agendadas.</p>
+                                <button class="btn btn-outline-success w-100 mt-2">Ver Minhas Aulas</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    `;
+}
+
+// --- TELA 3: PROFESSOR LOGADO ---
+function renderHomeProfessor(usuario) {
+    return `
+    <div class="container py-5">
+        <div class="row justify-content-center text-center">
+            <div class="col-lg-8">
+                <h1 class="fw-bold text-primary mb-3">Bem vindo, Prof. ${usuario.nome.split(' ')[0]}!</h1>
+                <p class="lead text-muted mb-5">Obrigado por fazer a diferença na educação.</p>
+                
+                <div class="card border-0 shadow-sm p-5">
+                    <div class="card-body">
+                        <i class="bi bi-calendar-week text-primary mb-3" style="font-size: 4rem;"></i>
+                        <h3 class="fw-bold mt-3">Gerenciar Agenda</h3>
+                        <p class="text-muted">Cadastre seus horários livres para que os alunos possam te encontrar.</p>
+                        
+                        <button class="btn botao-verde btn-lg px-5 mt-3" data-route="dashboard">
+                            Ir para meu Painel
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    `;
+}
+
+// --- FUNÇÃO PRINCIPAL ---
+export function obterConteudoHome() {
+    const usuario = authService.getUsuario();
+
+    // Se nao tiver ninguem, mostra a capa do site (visitante)
+    if (!usuario) {
+        return renderHomeVisitante();
+    }
+
+    // Se tiver logado, verifica o tipo pra mostrar a home certa
+    if (usuario.tipo === 'professor') {
+        return renderHomeProfessor(usuario);
+    } else {
+        return renderHomeAluno(usuario);
+    }
 }

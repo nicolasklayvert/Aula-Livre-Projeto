@@ -65,3 +65,15 @@ class Certificado(models.Model):
 
     def __str__(self):
         return f"Certificado {self.codigo_validacao}"
+    
+
+class Avaliacao(models.Model):
+    agendamento = models.OneToOneField(Agendamento, on_delete=models.CASCADE)
+    
+    # Nota de 1 a 5
+    nota = models.IntegerField(choices=[(i, str(i)) for i in range(1, 6)])
+    comentario = models.TextField(blank=True, null=True)
+    criado_em = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Avaliação nota {self.nota} para {self.agendamento}"

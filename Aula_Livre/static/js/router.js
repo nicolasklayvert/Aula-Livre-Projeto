@@ -256,11 +256,18 @@ function configurarAvaliacao() {
         e.preventDefault();
 
         const nota = document.getElementById('nota-final').value;
+        // NOVA LINHA: Pega o comentário do textarea
+        const comentario = novoForm.querySelector('textarea').value;
         
         // valida se escolheu estrela
         if (nota == "0") {
             window.mostrarNotificacao('Selecione pelo menos 1 estrela!', 'erro');
             return;
+        }
+
+        // NOVA LOGICA: Salva no mock do dashboard
+        if (typeof window.salvarAvaliacaoMock === 'function') {
+            window.salvarAvaliacaoMock(nota, comentario);
         }
 
         // fecha o modal
@@ -321,7 +328,7 @@ document.addEventListener('DOMContentLoaded', () => {
     configurarLogin();
     configurarCadastro();
     configurarGestaoHorarios(); // ativei o form do professor
-    configurarDisciplinas(); // ativei o form de disciplinas (NOVO!)
+    configurarDisciplinas(); // ativei o form de disciplinas 
     configurarAvaliacao(); // ativei o form da avaliacao
     configurarLogout();
 });

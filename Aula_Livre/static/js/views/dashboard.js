@@ -2,15 +2,48 @@
 
 import { authService } from '../services/auth.js';
 
-// --- DADOS MOCKADOS ---
+// --- DADOS MOCKADOS (Com dados extras para simular a avaliação salva) ---
 
 const mockAulasAluno = [
-    { id: 1, professor: "Ana Pereira", materia: "Inglês", data: "Terça - 19:00", status: "Confirmada", cor: "bg-success" },
-    { id: 2, professor: "Carlos Silva", materia: "Matemática", data: "Quarta - 16:00", status: "Pendente", cor: "bg-warning text-dark" },
-    // Aula concluída mas não avaliada (mostra botão avaliar)
-    { id: 3, professor: "Roberto Campos", materia: "Física", data: "Ontem", status: "Concluído", cor: "bg-secondary", avaliado: false },
-    // Aula já avaliada (mostra certificado)
-    { id: 4, professor: "Júlia Costa", materia: "Redação", data: "Semana passada", status: "Concluído", cor: "bg-secondary", avaliado: true }
+    { 
+        id: 1, 
+        professor: "Ana Pereira", 
+        materia: "Inglês", 
+        data: "Terça - 19:00", 
+        status: "Confirmada", 
+        cor: "bg-success",
+        avaliado: false 
+    },
+    { 
+        id: 2, 
+        professor: "Carlos Silva", 
+        materia: "Matemática", 
+        data: "Quarta - 16:00", 
+        status: "Pendente", 
+        cor: "bg-warning text-dark",
+        avaliado: false
+    },
+    // Aula concluída mas PENDENTE de avaliação
+    { 
+        id: 3, 
+        professor: "Roberto Campos", 
+        materia: "Física", 
+        data: "Ontem", 
+        status: "Concluído", 
+        cor: "bg-secondary", 
+        avaliado: false 
+    },
+    // Aula concluída e JÁ AVALIADA (Simulando dados salvos)
+    { 
+        id: 4, 
+        professor: "Júlia Costa", 
+        materia: "Redação", 
+        data: "Semana passada", 
+        status: "Concluído", 
+        cor: "bg-secondary", 
+        avaliado: true,
+        minhaAvaliacao: { nota: 5, comentario: "Aula excelente, adorei a didática!" }
+    }
 ];
 
 export const mockHorariosProfessor = [
@@ -19,26 +52,26 @@ export const mockHorariosProfessor = [
     { id: 3, dia: "Sexta", hora: "18:00", status: "Concluído", aluno: "Maria", cor: "bg-success" }
 ];
 
-// MOCK DAS DISCIPLINAS DO PROFESSOR 
 let minhasDisciplinasMock = ["Matemática", "Física"]; 
 
 // --- VARIAVEIS GLOBAIS ---
 let acaoPendente = null;
 let idPendente = null;
 let modalConfirmacaoInstance = null;
+// Variável auxiliar para saber qual aula está sendo avaliada no momento
+let idAulaSendoAvaliada = null; 
 
 // --- FUNCOES AUXILIARES ---
 
-// Função segura para chamar notificação
 function notificarSeguro(msg, tipo) {
     if (typeof window.mostrarNotificacao === 'function') {
         window.mostrarNotificacao(msg, tipo);
     } else {
-        console.warn("Toast não encontrado:", msg);
         alert(msg); 
     }
 }
 
+// Funções do Professor (mantidas iguais)
 window.solicitarGerenciamento = function(id, acao) {
     acaoPendente = acao;
     idPendente = id;
@@ -60,36 +93,145 @@ window.confirmarAcaoPendente = function() {
     
     if (index !== -1) {
         const horario = mockHorariosProfessor[index];
-
         if (acaoPendente === 'concluir') {
             horario.status = 'Concluído';
             horario.cor = 'bg-success';
             notificarSeguro('Aula concluída!', 'sucesso');
-        } 
-        else if (acaoPendente === 'cancelar') {
+        } else if (acaoPendente === 'cancelar') {
             horario.status = 'Livre';
             horario.aluno = '-';
             horario.cor = 'bg-info text-dark';
             notificarSeguro('Cancelado.', 'sucesso');
-        } 
-        else if (acaoPendente === 'excluir') {
+        } else if (acaoPendente === 'excluir') {
             mockHorariosProfessor.splice(index, 1);
             notificarSeguro('Horário excluído.', 'sucesso');
         }
     }
-
     if (modalConfirmacaoInstance) modalConfirmacaoInstance.hide();
-
-    setTimeout(() => {
-        document.getElementById('conteudo-principal').innerHTML = obterConteudoDashboard();
-    }, 200);
+    setTimeout(() => { document.getElementById('conteudo-principal').innerHTML = obterConteudoDashboard(); }, 200);
 }
 
-window.selecionarEstrela = function(nota) { document.getElementById('nota-final').value = nota; const estrelas = document.querySelectorAll('.estrela-interativa'); estrelas.forEach(estrela => { const valorEstrela = parseInt(estrela.getAttribute('data-nota')); if (valorEstrela <= nota) { estrela.classList.remove('bi-star'); estrela.classList.add('bi-star-fill'); } else { estrela.classList.remove('bi-star-fill'); estrela.classList.add('bi-star'); } }); }
-window.abrirAvaliacao = function(nomeProfessor) { document.getElementById('nome-avaliado').innerText = nomeProfessor; window.selecionarEstrela(0); const modalEl = document.getElementById('modal-avaliacao'); const modal = new bootstrap.Modal(modalEl); modal.show(); }
-window.verCertificado = function(nomePessoa, materia) { document.getElementById('cert-nome-pessoa').innerText = nomePessoa; document.getElementById('cert-materia').innerText = materia; const dataHoje = new Date().toLocaleDateString('pt-BR'); document.getElementById('cert-data').innerText = dataHoje; const modalEl = document.getElementById('modal-certificado'); const modal = new bootstrap.Modal(modalEl); modal.show(); }
+// --- LÓGICA DE AVALIAÇÃO E CERTIFICADO ---
 
-// Preenche o <select> do modal
+window.selecionarEstrela = function(nota) { 
+    // Se o campo estiver desabilitado (modo visualização), não faz nada
+    if (document.getElementById('nota-final').disabled) return;
+
+    document.getElementById('nota-final').value = nota; 
+    const estrelas = document.querySelectorAll('.estrela-interativa'); 
+    estrelas.forEach(estrela => { 
+        const valorEstrela = parseInt(estrela.getAttribute('data-nota')); 
+        if (valorEstrela <= nota) { 
+            estrela.classList.remove('bi-star'); 
+            estrela.classList.add('bi-star-fill'); 
+        } else { 
+            estrela.classList.remove('bi-star-fill'); 
+            estrela.classList.add('bi-star'); 
+        } 
+    }); 
+}
+
+// Abre o modal para criar uma nova avaliação
+window.abrirAvaliacao = function(idAula, nomeProfessor) { 
+    idAulaSendoAvaliada = idAula; // Salva o ID pra usar no salvar
+    
+    // Reseta o form para estado "editável"
+    const form = document.getElementById('form-avaliacao');
+    form.reset();
+    document.getElementById('nota-final').value = "0";
+    document.getElementById('nota-final').disabled = false;
+    
+    // Reseta estrelas
+    const estrelas = document.querySelectorAll('.estrela-interativa');
+    estrelas.forEach(e => {
+        e.classList.remove('bi-star-fill');
+        e.classList.add('bi-star');
+        e.style.cursor = 'pointer'; // volta o cursor de clique
+    });
+
+    // Limpa e habilita textarea e botão
+    const textarea = form.querySelector('textarea');
+    textarea.value = '';
+    textarea.disabled = false;
+    
+    const btnSubmit = form.querySelector('button[type="submit"]');
+    btnSubmit.style.display = 'block'; // Mostra o botão enviar
+
+    document.getElementById('nome-avaliado').innerText = nomeProfessor; 
+    
+    const modalEl = document.getElementById('modal-avaliacao'); 
+    const modal = new bootstrap.Modal(modalEl); 
+    modal.show(); 
+}
+
+// Abre o modal APENAS PARA LEITURA
+window.verAvaliacao = function(idAula, nomeProfessor) {
+    const aula = mockAulasAluno.find(a => a.id === idAula);
+    if (!aula || !aula.minhaAvaliacao) return;
+
+    const dados = aula.minhaAvaliacao;
+
+    // Preenche as estrelas visualmente
+    const estrelas = document.querySelectorAll('.estrela-interativa');
+    estrelas.forEach(estrela => {
+        const valorEstrela = parseInt(estrela.getAttribute('data-nota'));
+        // Remove comportamento de clique visual (cursor)
+        estrela.style.cursor = 'default';
+        
+        if (valorEstrela <= dados.nota) {
+            estrela.classList.remove('bi-star');
+            estrela.classList.add('bi-star-fill');
+        } else {
+            estrela.classList.remove('bi-star-fill');
+            estrela.classList.add('bi-star');
+        }
+    });
+
+    // Desabilita campos
+    document.getElementById('nota-final').value = dados.nota;
+    document.getElementById('nota-final').disabled = true;
+
+    const textarea = document.querySelector('#form-avaliacao textarea');
+    textarea.value = dados.comentario;
+    textarea.disabled = true;
+
+    // Esconde o botão de enviar pois é só visualização
+    const btnSubmit = document.querySelector('#form-avaliacao button[type="submit"]');
+    btnSubmit.style.display = 'none';
+
+    document.getElementById('nome-avaliado').innerText = nomeProfessor + " (Sua Avaliação)";
+    
+    const modalEl = document.getElementById('modal-avaliacao');
+    const modal = new bootstrap.Modal(modalEl);
+    modal.show();
+}
+
+// Lógica simulada de salvar avaliação (deve ser chamada no router.js ou aqui se movermos o listener)
+// Para simplificar, vou exportar uma função que o router pode usar ou adicionar listener direto aqui se necessário
+// Mas como o router já tem o 'configurarAvaliacao', vamos apenas atualizar o mock
+window.salvarAvaliacaoMock = function(nota, comentario) {
+    if (idAulaSendoAvaliada) {
+        const aula = mockAulasAluno.find(a => a.id === idAulaSendoAvaliada);
+        if (aula) {
+            aula.avaliado = true;
+            aula.minhaAvaliacao = { nota: parseInt(nota), comentario: comentario };
+            // Atualiza a tela
+            document.getElementById('conteudo-principal').innerHTML = obterConteudoDashboard();
+        }
+    }
+}
+
+window.verCertificado = function(nomePessoa, materia) { 
+    document.getElementById('cert-nome-pessoa').innerText = nomePessoa; 
+    document.getElementById('cert-materia').innerText = materia; 
+    const dataHoje = new Date().toLocaleDateString('pt-BR'); 
+    document.getElementById('cert-data').innerText = dataHoje; 
+    const modalEl = document.getElementById('modal-certificado'); 
+    const modal = new bootstrap.Modal(modalEl); 
+    modal.show(); 
+}
+
+// --- MODAIS DO PROFESSOR (MANTIDOS) ---
 export function atualizarSelectDoModal() {
     const select = document.getElementById('horario-disciplina');
     if (!select) return;
@@ -142,24 +284,75 @@ export function salvarDisciplinasSelecionadas() {
 
 // --- RENDERIZADORES ---
 
+// ATUALIZADO: Agora com colunas separadas para Avaliação e Certificado
 function gerarTabelaAluno() {
-    if (mockAulasAluno.length === 0) return `<tr><td colspan="4" class="text-center">Nenhuma aula.</td></tr>`;
-    return mockAulasAluno.map(aula => `
+    if (mockAulasAluno.length === 0) return `<tr><td colspan="5" class="text-center">Nenhuma aula.</td></tr>`;
+    
+    return mockAulasAluno.map(aula => {
+        let colAvaliacao = '';
+        let colCertificado = '';
+
+        // Se a aula NÃO foi concluída pelo professor
+        if (aula.status !== 'Concluído') {
+            // Se tiver link (agendada), mostra o botão de entrar, senão traço
+            const botaoEntrar = `<a href="#" class="btn btn-sm btn-outline-primary fw-bold text-decoration-none" title="Entrar na Sala"><i class="bi bi-camera-video-fill me-1"></i> Acessar</a>`;
+            
+            // Lógica: Se tá pendente/agendado, mostra link. Avaliação e Certificado ficam vazios.
+            colAvaliacao = '<span class="text-muted small">-</span>';
+            colCertificado = '<span class="text-muted small">-</span>';
+            
+            // Sobrescreve a ação principal na coluna de status ou cria uma lógica visual
+            // (Neste layout novo, o botão de entrar pode ficar na coluna status ou numa coluna "Link")
+            // Vamos manter simples: se não concluiu, não tem o que fazer nas colunas finais.
+        } 
+        // Se a aula FOI CONCLUÍDA
+        else {
+            if (aula.avaliado) {
+                // Já avaliou: Pode VER a avaliação (sem alterar) e BAIXAR certificado
+                colAvaliacao = `
+                    <button class="btn btn-sm btn-info text-white" onclick="window.verAvaliacao(${aula.id}, '${aula.professor}')">
+                        <i class="bi bi-eye-fill me-1"></i> Ver Avaliação
+                    </button>`;
+                
+                colCertificado = `
+                    <button class="btn btn-sm btn-outline-dark" onclick="window.verCertificado('${authService.getUsuario().nome}', '${aula.materia}')">
+                        <i class="bi bi-award-fill me-1"></i> Certificado
+                    </button>`;
+            } else {
+                // Não avaliou ainda: Botão Avaliar disponível, Certificado Bloqueado
+                colAvaliacao = `
+                    <button class="btn btn-sm btn-warning fw-bold" onclick="window.abrirAvaliacao(${aula.id}, '${aula.professor}')">
+                        <i class="bi bi-star-fill me-1"></i> Avaliar Aula
+                    </button>`;
+                
+                colCertificado = `
+                    <button class="btn btn-sm btn-light text-muted border" disabled title="Avalie para liberar">
+                        <i class="bi bi-lock-fill me-1"></i> Bloqueado
+                    </button>`;
+            }
+        }
+
+        return `
         <tr>
-            <td><div class="fw-bold">${aula.materia}</div><small class="text-muted">Prof. ${aula.professor}</small></td>
-            <td class="align-middle">${aula.data}</td>
-            <td class="align-middle"><span class="badge ${aula.cor}">${aula.status}</span></td>
-            <td class="text-end align-middle">
-                ${aula.status === 'Concluído' ? 
-                  (aula.avaliado ? 
-                    `<button class="btn btn-sm btn-outline-dark" onclick="window.verCertificado('${authService.getUsuario().nome}', '${aula.materia}')"><i class="bi bi-award"></i></button>` : 
-                    `<button class="btn btn-sm btn-warning" onclick="window.abrirAvaliacao('${aula.professor}')"><i class="bi bi-star-fill"></i></button>`) 
-                  : `<button class="btn btn-sm btn-outline-primary"><i class="bi bi-camera-video-fill"></i></button>`}
+            <td>
+                <div class="fw-bold">${aula.materia}</div>
+                <small class="text-muted">Prof. ${aula.professor}</small>
             </td>
-        </tr>`).join('');
+            <td class="align-middle">${aula.data}</td>
+            <td class="align-middle">
+                <span class="badge ${aula.cor}">${aula.status}</span>
+                ${aula.status !== 'Concluído' ? '<br><small class="text-primary" style="cursor:pointer">Link da aula</small>' : ''}
+            </td>
+            <td class="align-middle text-center">
+                ${colAvaliacao}
+            </td>
+            <td class="text-end align-middle">
+                ${colCertificado}
+            </td>
+        </tr>`;
+    }).join('');
 }
 
-// AQUI ESTÁ A FUNÇÃO QUE ESTAVA FALTANDO OU COM ERRO
 function renderPainelAluno(usuario) {
     return `
     <div class="container py-5">
@@ -200,7 +393,13 @@ function renderPainelAluno(usuario) {
                 <div class="table-responsive">
                     <table class="table table-hover align-middle mb-0">
                         <thead class="bg-light">
-                            <tr><th class="ps-4">Matéria</th><th>Data</th><th>Status</th><th class="text-end pe-4">Ação</th></tr>
+                            <tr>
+                                <th class="ps-4">Matéria</th>
+                                <th>Data</th>
+                                <th>Status</th>
+                                <th class="text-center">Avaliação</th>
+                                <th class="text-end pe-4">Certificado</th>
+                            </tr>
                         </thead>
                         <tbody class="ps-4">${gerarTabelaAluno()}</tbody>
                     </table>
@@ -210,18 +409,19 @@ function renderPainelAluno(usuario) {
     </div>`;
 }
 
+// --- TABELAS DO PROFESSOR (MANTIDAS IGUAIS) ---
 function gerarTabelaProfessor() {
     if (mockHorariosProfessor.length === 0) return `<tr><td colspan="5" class="text-center">Sem horários.</td></tr>`;
     
     return mockHorariosProfessor.map(item => {
         let acoes = '';
         if (item.status === 'Agendado') {
-            acoes = `<button class="btn btn-sm btn-success me-1" onclick="window.solicitarGerenciamento(${item.id}, 'concluir')"><i class="bi bi-check-lg"></i></button>
-                     <button class="btn btn-sm btn-outline-danger" onclick="window.solicitarGerenciamento(${item.id}, 'cancelar')"><i class="bi bi-trash"></i></button>`;
+            acoes = `<button class="btn btn-sm btn-success me-1" onclick="window.solicitarGerenciamento(${item.id}, 'concluir')" title="Concluir Aula"><i class="bi bi-check-lg"></i></button>
+                     <button class="btn btn-sm btn-outline-danger" onclick="window.solicitarGerenciamento(${item.id}, 'cancelar')" title="Cancelar"><i class="bi bi-trash"></i></button>`;
         } else if (item.status === 'Livre') {
-            acoes = `<button class="btn btn-sm btn-outline-danger" onclick="window.solicitarGerenciamento(${item.id}, 'excluir')"><i class="bi bi-trash"></i></button>`;
+            acoes = `<button class="btn btn-sm btn-outline-danger" onclick="window.solicitarGerenciamento(${item.id}, 'excluir')" title="Excluir Horário"><i class="bi bi-trash"></i></button>`;
         } else if (item.status === 'Concluído') {
-            acoes = `<button class="btn btn-sm btn-outline-dark" onclick="window.verCertificado('${authService.getUsuario().nome}', 'Voluntariado')"><i class="bi bi-award"></i></button>`;
+            acoes = `<span class="badge bg-success"><i class="bi bi-check-circle"></i> Finalizado</span>`;
         }
 
         return `
@@ -245,7 +445,6 @@ function gerarTabelaProfessor() {
 }
 
 function renderPainelProfessor(usuario) {
-    // Chama a funcao pra garantir que o select do modal esteja preenchido
     setTimeout(atualizarSelectDoModal, 100);
 
     return `
@@ -263,7 +462,6 @@ function renderPainelProfessor(usuario) {
         </div>
 
         <div class="row mb-5">
-            <!-- Cards... -->
             <div class="col-md-4 mb-3"><div class="card border-0 shadow-sm p-3 h-100"><div class="d-flex align-items-center"><div class="bg-light p-3 rounded-circle me-3 text-warning"><i class="bi bi-people fs-4"></i></div><div><h6 class="mb-0 text-muted">Alunos</h6><h3 class="fw-bold mb-0">15</h3></div></div></div></div>
             <div class="col-md-4 mb-3"><div class="card border-0 shadow-sm p-3 h-100"><div class="d-flex align-items-center"><div class="bg-light p-3 rounded-circle me-3 text-info"><i class="bi bi-patch-check fs-4"></i></div><div><h6 class="mb-0 text-muted">Horas</h6><h3 class="fw-bold mb-0">24h</h3></div></div></div></div>
             
@@ -299,7 +497,5 @@ function renderPainelProfessor(usuario) {
 export function obterConteudoDashboard() {
     const usuario = authService.getUsuario();
     if (!usuario) return '';
-    
-    // A função renderPainelAluno está logo acima, então o erro deve sumir
     return (usuario.tipo === 'professor') ? renderPainelProfessor(usuario) : renderPainelAluno(usuario);
 }

@@ -1,7 +1,8 @@
 // js/views/explorar.js
 
+import { authService } from '../services/auth.js'; // <--- Importamos para checar o login
+
 // lista mockada pra gente testar o front.
-// depois isso aqui vai virar um json q vem do django
 const listaDeProfessores = [
     {
         id: 1,
@@ -42,8 +43,14 @@ const listaDeProfessores = [
 ];
 
 // funcao global pra abrir o modal.
-// precisa ser window pq o html gerado dinamicamente nao enxerga ela se ficar fechada no modulo
 window.abrirModalAgendamento = function(id) {
+    // SEGURANÇA EXTRA: Se por algum motivo um visitante conseguir chamar essa função, barramos aqui também.
+    if (!authService.usuarioEstaLogado()) {
+        const modalLogin = new bootstrap.Modal(document.getElementById('modal-entrar'));
+        modalLogin.show();
+        return;
+    }
+
     const professor = listaDeProfessores.find(p => p.id === id);
 
     if (!professor) return;
@@ -73,17 +80,16 @@ window.abrirModalAgendamento = function(id) {
                 const modalInstance = bootstrap.Modal.getInstance(modalElemento);
                 modalInstance.hide();
 
-                // 2. atualiza o texto da notificacao (IDs novos do index.html)
+                // 2. atualiza o texto da notificacao
                 const toastEl = document.getElementById('toast-sistema');
                 const toastMsg = document.getElementById('toast-mensagem');
                 const toastIcone = document.getElementById('toast-icone');
                 
-                // Força visual de sucesso (verde e check)
                 toastEl.className = 'toast align-items-center text-white border-0 bg-success';
                 toastIcone.className = 'bi bi-check-circle-fill me-2';
                 toastMsg.innerText = `Sucesso! Aula com ${professor.nome} agendada para ${horario}.`;
 
-                // 3. mostra o toast (a caixinha verde no canto)
+                // 3. mostra o toast
                 const toastBootstrap = new bootstrap.Toast(toastEl);
                 toastBootstrap.show();
 
@@ -102,6 +108,26 @@ window.abrirModalAgendamento = function(id) {
 
 // gera o html de cada card
 function criarCardProfessor(professor) {
+    const estaLogado = authService.usuarioEstaLogado();
+
+    
+    // Se estiver logado: Mostra botão normal que abre a agenda
+    // Se NÃO estiver logado: Mostra botão que abre o modal de Login e muda o texto
+    
+    let botaoAcao = '';
+
+    if (estaLogado) {
+        botaoAcao = `
+        <button class="btn btn-outline-primary btn-sm" onclick="window.abrirModalAgendamento(${professor.id})">
+            Ver Horários
+        </button>`;
+    } else {
+        botaoAcao = `
+        <button class="btn btn-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#modal-entrar">
+            <i class="bi bi-lock-fill me-1"></i> Entre para ver horários
+        </button>`;
+    }
+
     return `
         <div class="col-md-4 mb-4">
             <div class="card shadow-sm border-0 h-100">
@@ -122,9 +148,7 @@ function criarCardProfessor(professor) {
                     </p>
                     
                     <div class="d-grid mt-auto">
-                        <button class="btn btn-outline-primary btn-sm" onclick="window.abrirModalAgendamento(${professor.id})">
-                            Ver Horários
-                        </button>
+                        ${botaoAcao}
                     </div>
 
                 </div>
@@ -135,6 +159,8 @@ function criarCardProfessor(professor) {
 
 // exporta a view pro router
 export function obterConteudoExplorar() {
+    // Como a função criarCardProfessor agora checa o login internamente, 
+    // basta chamar o map normalmente que ele já decide qual botão mostrar.
     const cardsHtml = listaDeProfessores.map(criarCardProfessor).join('');
 
     return `

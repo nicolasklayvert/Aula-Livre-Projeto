@@ -163,23 +163,61 @@
                 </div>
                 <div class="modal-body p-4">
                     <form id="form-novo-horario">
+                        
                         <div class="mb-3">
-                            <label class="form-label small text-muted">Dia da Semana</label>
-                            <select class="form-select bg-light" id="horario-dia" required>
-                                <option value="Segunda">Segunda-feira</option>
-                                <option value="Terça">Terça-feira</option>
-                                <option value="Quarta">Quarta-feira</option>
-                                <option value="Quinta">Quinta-feira</option>
-                                <option value="Sexta">Sexta-feira</option>
-                                <option value="Sábado">Sábado</option>
-                            </select>
+                            <label class="form-label small text-muted">Disciplina</label>
+                            <select class="form-select bg-light" id="horario-disciplina" required>
+                                <option selected disabled>Carregando disciplinas...</option>
+                                </select>
                         </div>
+
+                        <div class="row">
+                            <div class="col-6 mb-3">
+                                <label class="form-label small text-muted">Nível</label>
+                                <select class="form-select bg-light" id="horario-nivel" required>
+                                    <option value="Fundamental 1">Fundamental 1</option>
+                                    <option value="Fundamental 2">Fundamental 2</option>
+                                    <option value="Ensino Médio">Ensino Médio</option>
+                                    <option value="Pré-Vestibular">Pré-Vestibular</option>
+                                    <option value="Superior">Ensino Superior</option>
+                                </select>
+                            </div>
+                            <div class="col-6 mb-3">
+                                <label class="form-label small text-muted">Assunto / Tema</label>
+                                <input type="text" class="form-control bg-light" id="horario-assunto" placeholder="Ex: Logaritmos" required>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-6 mb-3">
+                                <label class="form-label small text-muted">Dia da Semana</label>
+                                <select class="form-select bg-light" id="horario-dia" required>
+                                    <option value="Segunda">Segunda-feira</option>
+                                    <option value="Terça">Terça-feira</option>
+                                    <option value="Quarta">Quarta-feira</option>
+                                    <option value="Quinta">Quinta-feira</option>
+                                    <option value="Sexta">Sexta-feira</option>
+                                    <option value="Sábado">Sábado</option>
+                                </select>
+                            </div>
+                            <div class="col-6 mb-3">
+                                <label class="form-label small text-muted">Horário</label>
+                                <input type="time" class="form-control bg-light" id="horario-hora" required>
+                            </div>
+                        </div>
+
                         <div class="mb-3">
-                            <label class="form-label small text-muted">Horário</label>
-                            <input type="time" class="form-control bg-light" id="horario-hora" required>
+                            <label class="form-label small text-muted">Descrição da Aula</label>
+                            <textarea class="form-control bg-light" id="horario-descricao" rows="2" placeholder="Descreva o que será ensinado ou pré-requisitos..."></textarea>
                         </div>
+
+                        <div class="mb-3">
+                            <label class="form-label small text-muted">Link da Sala Virtual</label>
+                            <input type="url" class="form-control bg-light" id="horario-link" placeholder="https://meet.google.com/..." required>
+                        </div>
+
                         <div class="d-grid mt-4">
-                            <button type="submit" class="btn botao-verde">Salvar Horário</button>
+                            <button type="submit" class="btn botao-verde">Publicar Horário</button>
                         </div>
                     </form>
                 </div>
@@ -270,6 +308,98 @@
             </div>
         </div>
     </div>
+
+    <div class="modal fade" id="modal-disciplinas" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow">
+                <div class="modal-header border-0 pb-0">
+                    <h5 class="modal-title fw-bold text-primary">O que você leciona?</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <p class="text-muted small mb-3">Selecione uma ou mais disciplinas que você domina:</p>
+                    
+                    <form id="form-disciplinas">
+                        <div class="row g-3">
+                            <div class="col-6">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" value="Matemática" id="disc-mat">
+                                    <label class="form-check-label" for="disc-mat">Matemática</label>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" value="Português" id="disc-port">
+                                    <label class="form-check-label" for="disc-port">Português</label>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" value="Redação" id="disc-red">
+                                    <label class="form-check-label" for="disc-red">Redação</label>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" value="Física" id="disc-fis">
+                                    <label class="form-check-label" for="disc-fis">Física</label>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" value="Química" id="disc-qui">
+                                    <label class="form-check-label" for="disc-qui">Química</label>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" value="Biologia" id="disc-bio">
+                                    <label class="form-check-label" for="disc-bio">Biologia</label>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" value="História" id="disc-his">
+                                    <label class="form-check-label" for="disc-his">História</label>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" value="Inglês" id="disc-ing">
+                                    <label class="form-check-label" for="disc-ing">Inglês</label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="d-grid mt-4">
+                            <button type="submit" class="btn botao-verde">Salvar Disciplinas</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="modal-confirmacao" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-sm">
+            <div class="modal-content border-0 shadow">
+                <div class="modal-body p-4 text-center">
+                    <div class="mb-3">
+                        <i class="bi bi-exclamation-circle text-warning" style="font-size: 3rem;"></i>
+                    </div>
+                    <h5 class="fw-bold mb-2">Tem certeza?</h5>
+                    <p class="text-muted small mb-4" id="texto-confirmacao">Essa ação não poderá ser desfeita.</p>
+                    
+                    <div class="d-grid gap-2">
+                        <button type="button" class="btn btn-primary" onclick="window.confirmarAcaoPendente()">Sim, confirmar</button>
+                        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    
 
     <div class="toast-container position-fixed bottom-0 end-0 p-3">
         <div id="toast-sistema" class="toast align-items-center text-white border-0" role="alert" aria-live="assertive" aria-atomic="true">

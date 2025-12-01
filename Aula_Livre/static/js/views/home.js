@@ -96,7 +96,7 @@ function renderHomeAluno(usuario) {
                                 </div>
                                 <h4 class="fw-bold">Buscar Aulas</h4>
                                 <p class="text-muted small">Encontre professores de Matemática, Inglês e mais.</p>
-                                <button class="btn btn-outline-primary w-100 mt-2">Ir para Busca</button>
+                                <button class="btn btn-outline-primary w-100 mt-2" data-route="explorar">Ir para Busca</button>
                             </div>
                         </div>
                     </div>
@@ -109,7 +109,7 @@ function renderHomeAluno(usuario) {
                                 </div>
                                 <h4 class="fw-bold">Meu Painel</h4>
                                 <p class="text-muted small">Veja suas próximas aulas agendadas.</p>
-                                <button class="btn btn-outline-success w-100 mt-2">Ver Minhas Aulas</button>
+                                <button class="btn btn-outline-success w-100 mt-2" data-route="dashboard">Ver Minhas Aulas</button>
                             </div>
                         </div>
                     </div>

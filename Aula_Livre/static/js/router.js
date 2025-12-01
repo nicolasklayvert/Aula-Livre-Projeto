@@ -2,7 +2,7 @@
 
 import { obterConteudoHome } from './views/home.js';
 import { obterConteudoExplorar } from './views/explorar.js';
-import { obterConteudoDashboard, adicionarHorarioMock } from './views/dashboard.js'; // <--- importei a funcao de add mock
+import { obterConteudoDashboard, adicionarHorarioMock, salvarDisciplinasSelecionadas } from './views/dashboard.js'; // <--- importei a funcao de add mock e de salvar disciplinas
 import { authService } from './services/auth.js'; 
 
 // lista das rotas do app.
@@ -23,7 +23,7 @@ function navegar(rota) {
     
     // SEGURANCA: se tentar acessar area vip sem cracha, barra o cara
     if (rotasProtegidas.includes(rota) && !authService.usuarioEstaLogado()) {
-        mostrarNotificacao('Epa! Precisa fazer login pra acessar essa página.', 'erro');
+        window.mostrarNotificacao('Epa! Precisa fazer login pra acessar essa página.', 'erro');
         navegar('home'); // chuta de volta pra home
         
         // ja abre o modal na cara dele pra facilitar a vida
@@ -53,7 +53,8 @@ function navegar(rota) {
 
 // funcao nova pra pintar o toast de verde (sucesso) ou vermelho (erro)
 // o 'tipo' define a cor. se nao passar nada, assume que é sucesso
-function mostrarNotificacao(mensagem, tipo = 'sucesso') {
+// CORRECAO: Adicionei window. para o dashboard conseguir usar
+window.mostrarNotificacao = function(mensagem, tipo = 'sucesso') {
     const toastEl = document.getElementById('toast-sistema');
     const toastIcone = document.getElementById('toast-icone');
     const toastMsg = document.getElementById('toast-mensagem');
@@ -90,7 +91,7 @@ function atualizarNavbar() {
         navLogado.classList.remove('d-none');
         spanNome.innerText = usuario.nome.split(' ')[0]; // pega so o primeiro nome
 
-        // se for professor, esconde o botao de explorar pq ele nao precisa
+        // LOGICA NOVA: se for professor, esconde o botao de explorar pq ele nao precisa
         if (usuario.tipo === 'professor') {
             linkExplorar.classList.add('d-none');
         } else {
@@ -105,13 +106,13 @@ function atualizarNavbar() {
     }
 }
 
-// ve o submit do form de login
+// escuta o submit do form de login
 function configurarLogin() {
     const formLogin = document.getElementById('form-login');
     
     if (!formLogin) return; // se nao tiver modal na tela, ignora
 
-    //clonar o elemento remove os listeners antigos pra nao duplicar
+    // hackzinho: clonar o elemento remove os listeners antigos pra nao duplicar
     const novoForm = formLogin.cloneNode(true);
     formLogin.parentNode.replaceChild(novoForm, formLogin);
 
@@ -134,23 +135,23 @@ function configurarLogin() {
             atualizarNavbar();
             
             // troquei o alert pelo toast novo
-            mostrarNotificacao(`Bem vindo de volta, ${authService.getUsuario().nome}!`, 'sucesso');
+            window.mostrarNotificacao(`Bem vindo de volta, ${authService.getUsuario().nome}!`, 'sucesso');
 
             // UX: logou, vai pra home personalizada (MUDANÇA AQUI)
             navegar('home');
         } else {
             // avisa que deu ruim em vermelho
-            mostrarNotificacao(resultado.erro, 'erro');
+            window.mostrarNotificacao(resultado.erro, 'erro');
         }
     });
 }
 
-// configura o submit do cadastro 
+// configura o submit do cadastro (NOVO)
 function configurarCadastro() {
     const formCadastro = document.getElementById('form-cadastro');
     if (!formCadastro) return; 
 
-    // mesmo esquema do login pra limpar listeners
+    // mesmo hackzinho do login pra limpar listeners
     const novoForm = formCadastro.cloneNode(true);
     formCadastro.parentNode.replaceChild(novoForm, formCadastro);
 
@@ -172,9 +173,9 @@ function configurarCadastro() {
             modal.hide();
 
             atualizarNavbar();
-            mostrarNotificacao(`Conta criada! Bem vindo, ${nome}.`, 'sucesso');
+            window.mostrarNotificacao(`Conta criada! Bem vindo, ${nome}.`, 'sucesso');
             
-            // UX: cadastro feito, vai pra home personalizada 
+            // UX: cadastro feito, vai pra home personalizada (MUDANÇA AQUI)
             navegar('home');
         }
     });
@@ -191,20 +192,54 @@ function configurarGestaoHorarios() {
     novoForm.addEventListener('submit', (e) => {
         e.preventDefault();
 
-        const dia = document.getElementById('horario-dia').value;
-        const hora = document.getElementById('horario-hora').value;
+        // ATUALIZADO: Pega todos os campos novos do modal
+        const dadosAula = {
+            dia: document.getElementById('horario-dia').value,
+            hora: document.getElementById('horario-hora').value,
+            disciplina: document.getElementById('horario-disciplina').value,
+            nivel: document.getElementById('horario-nivel').value,
+            assunto: document.getElementById('horario-assunto').value,
+            link: document.getElementById('horario-link').value
+        };
 
-        // adiciona na lista fake lá da dashboard.js
-        adicionarHorarioMock(dia, hora);
+        // adiciona na lista fake lá da dashboard.js passando o objeto completo
+        adicionarHorarioMock(dadosAula);
 
         // fecha o modal
         const modalEl = document.getElementById('modal-novo-horario');
         const modal = bootstrap.Modal.getInstance(modalEl);
         modal.hide();
 
-        mostrarNotificacao('Horário cadastrado com sucesso!', 'sucesso');
+        window.mostrarNotificacao('Horário cadastrado com sucesso!', 'sucesso');
 
         // recarrega o dashboard pra tabela atualizar
+        navegar('dashboard');
+    });
+}
+
+// configura o submit das disciplinas (PROFESSOR) (NOVO!)
+function configurarDisciplinas() {
+    const formDisc = document.getElementById('form-disciplinas');
+    if (!formDisc) return; // se nao tiver o modal, nao faz nada
+
+    // mesmo hackzinho pra limpar listeners
+    const novoForm = formDisc.cloneNode(true);
+    formDisc.parentNode.replaceChild(novoForm, formDisc);
+
+    novoForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+
+        // Salva no mock do dashboard
+        salvarDisciplinasSelecionadas();
+
+        // Fecha o modal
+        const modalEl = document.getElementById('modal-disciplinas');
+        const modal = bootstrap.Modal.getInstance(modalEl);
+        modal.hide();
+
+        window.mostrarNotificacao('Disciplinas atualizadas!', 'sucesso');
+        
+        // Atualiza a tela pra mostrar as tags novas
         navegar('dashboard');
     });
 }
@@ -224,7 +259,7 @@ function configurarAvaliacao() {
         
         // valida se escolheu estrela
         if (nota == "0") {
-            mostrarNotificacao('Selecione pelo menos 1 estrela!', 'erro');
+            window.mostrarNotificacao('Selecione pelo menos 1 estrela!', 'erro');
             return;
         }
 
@@ -233,7 +268,7 @@ function configurarAvaliacao() {
         const modal = bootstrap.Modal.getInstance(modalEl);
         modal.hide();
 
-        mostrarNotificacao('Avaliação enviada! Obrigado.', 'sucesso');
+        window.mostrarNotificacao('Avaliação enviada! Obrigado.', 'sucesso');
         
         // Recarrega o dashboard
         navegar('dashboard');
@@ -249,7 +284,7 @@ function configurarLogout() {
             atualizarNavbar();
             
             // feedback visual pro usuario saber que saiu mesmo
-            mostrarNotificacao('Você saiu.', 'sucesso');
+            window.mostrarNotificacao('Você saiu.', 'sucesso');
             
             navegar('home'); // chuta o cara pra home
         });
@@ -274,6 +309,7 @@ document.addEventListener('click', (e) => {
 
 // qdo o html terminar de carregar, ja chama a home direto
 document.addEventListener('DOMContentLoaded', () => {
+    // CORRECAO DO F5:
     // Tenta pegar a rota que ta escrita lá na url depois do # (ex: #dashboard)
     // O slice(1) serve pra tirar o caractere # da frente
     const rotaSalva = window.location.hash.slice(1);
@@ -285,6 +321,7 @@ document.addEventListener('DOMContentLoaded', () => {
     configurarLogin();
     configurarCadastro();
     configurarGestaoHorarios(); // ativei o form do professor
+    configurarDisciplinas(); // ativei o form de disciplinas (NOVO!)
     configurarAvaliacao(); // ativei o form da avaliacao
     configurarLogout();
 });

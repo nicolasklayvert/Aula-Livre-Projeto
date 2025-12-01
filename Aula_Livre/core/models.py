@@ -46,9 +46,10 @@ class Agendamento(models.Model):
     link = models.URLField(max_length=200, blank=True, null=True)
     status = models.CharField(
         max_length=20,
-        choices=[('AGENDADO'), ('CONCLUIDO'), ('CANCELADO')],
+        choices=[('AGENDADO','Agendado'), ('CONCLUIDO','Concluído'), ('CANCELADO','Cancelado')],
         default='AGENDADO'
     )
+
 
     def __str__(self):
         return f"Aula de {self.disciplina} - {self.aluno} com {self.disponibilidade.professor}"
@@ -61,5 +62,18 @@ class Certificado(models.Model):
     data_emissao = models.DateTimeField(auto_now_add=True)
     horas = models.DecimalField(max_digits=4, decimal_places=2, default=1.0)
 
+
     def __str__(self):
         return f"Certificado {self.codigo_validacao}"
+    
+
+class Avaliacao(models.Model):
+    agendamento = models.OneToOneField(Agendamento, on_delete=models.CASCADE)
+    
+    # Nota de 1 a 5
+    nota = models.IntegerField(choices=[(i, str(i)) for i in range(1, 6)])
+    comentario = models.TextField(blank=True, null=True)
+    criado_em = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Avaliação nota {self.nota} para {self.agendamento}"

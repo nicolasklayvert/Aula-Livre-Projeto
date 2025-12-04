@@ -174,10 +174,10 @@ window.selecionarEstrela = function(nota) {
     });
 };
 
-window.abrirAvaliacao = function(idAgendamento, nomeProfessor) {
+window.abrirAvaliacao = function(idAgendamento, nomePessoa) {
     idAulaSendoAvaliada = idAgendamento;
     
-    document.getElementById('nome-avaliado').innerText = nomeProfessor;
+    document.getElementById('nome-avaliado').innerText = nomePessoa;
     
     const inputNota = document.getElementById('nota-final');
     inputNota.value = "0";
@@ -186,7 +186,7 @@ window.abrirAvaliacao = function(idAgendamento, nomeProfessor) {
     const textarea = document.querySelector('#form-avaliacao textarea');
     textarea.value = "";
     textarea.disabled = false;
-    textarea.placeholder = "O que você achou da didática?";
+    textarea.placeholder = "O que você achou?";
 
     const estrelas = document.querySelectorAll('.estrela-interativa');
     estrelas.forEach(e => {
@@ -208,8 +208,8 @@ window.abrirAvaliacao = function(idAgendamento, nomeProfessor) {
     new bootstrap.Modal(document.getElementById('modal-avaliacao')).show();
 };
 
-window.verAvaliacao = function(nota, comentario, nomeProfessor) {
-    document.getElementById('nome-avaliado').innerText = nomeProfessor + " (Feita)";
+window.verAvaliacao = function(nota, comentario, nomePessoa) {
+    document.getElementById('nome-avaliado').innerText = nomePessoa + " (Feita)";
 
     const inputNota = document.getElementById('nota-final');
     inputNota.value = nota;
@@ -259,7 +259,7 @@ window.enviarAvaliacao = async function() {
             bootstrap.Modal.getInstance(document.getElementById('modal-avaliacao')).hide();
             document.getElementById('conteudo-principal').innerHTML = await obterConteudoDashboard();
         } else {
-            alert("Erro ao salvar avaliação.");
+            alert("Erro ao salvar avaliação. (Talvez já tenha sido avaliada?)");
         }
     } catch (e) { console.error(e); }
 };
@@ -300,7 +300,7 @@ function gerarTabelaAluno(listaAgendamentos) {
                 botaoAvaliacao = `
                     <button class="btn btn-sm btn-info text-white me-1" 
                             onclick="window.verAvaliacao(${aula.avaliacao.nota}, '${escapeHtml(aula.avaliacao.comentario)}', '${aula.professor_nome}')">
-                        <i class="bi bi-eye-fill"></i> Ver Avaliação
+                        <i class="bi bi-eye-fill"></i> Ver
                     </button>`;
             } else {
                 botaoAvaliacao = `
@@ -313,7 +313,7 @@ function gerarTabelaAluno(listaAgendamentos) {
             acoes = `
                 ${botaoAvaliacao}
                 <button class="btn btn-sm btn-dark" onclick="window.verCertificado('${aula.aluno_nome}', '${aula.disciplina_nome}')">
-                    <i class="bi bi-award"></i> Certificado
+                    <i class="bi bi-award"></i> Cert.
                 </button>
             `;
         } else if (aula.status === 'CANCELADO') {
@@ -323,7 +323,9 @@ function gerarTabelaAluno(listaAgendamentos) {
 
         return `
         <tr>
-            <td><div class="fw-bold">${aula.disciplina_nome || 'Aula'}</div><small class="text-muted">Prof. ${aula.professor_nome}</small></td>
+            <td>
+                <div class="fw-bold text-primary">${aula.disciplina_nome || 'Aula'} <i class="bi bi-chevron-right small"></i> ${aula.assunto || 'Geral'}</div>
+            </td>
             <td class="align-middle">${formatarDataBr(aula.data)} - ${aula.hora.slice(0,5)}</td>
             <td class="align-middle">${statusBadge}</td>
             <td class="align-middle text-center"> - </td>
@@ -332,6 +334,7 @@ function gerarTabelaAluno(listaAgendamentos) {
     }).join('');
 }
 
+// CORREÇÃO 1: Agora usa o ID como value, não o nome
 export async function atualizarSelectDoModal() {
     const select = document.getElementById('horario-disciplina');
     if (!select) return;
@@ -343,7 +346,8 @@ export async function atualizarSelectDoModal() {
     if (disciplinas.length === 0) select.innerHTML = '<option disabled>Nenhuma disciplina</option>';
     else disciplinas.forEach(disc => {
         const option = document.createElement('option');
-        option.value = disc.nome; option.innerText = disc.nome;
+        option.value = disc.id; // SALVA O ID!
+        option.innerText = disc.nome;
         select.appendChild(option);
     });
 }
@@ -353,12 +357,10 @@ window.abrirModalNovoHorario = function() {
     new bootstrap.Modal(document.getElementById('modal-novo-horario')).show();
 }
 
-// Renomeado para refletir que faz um POST real
+// CORREÇÃO 2: Pega o ID direto do select
 export const adicionarHorario = async (dados) => {
     const usuario = authService.getUsuario();
-    const todasDisciplinas = await buscarDisciplinas();
-    const disciplinaEncontrada = todasDisciplinas.find(d => d.nome === dados.disciplina);
-    const disciplinaId = disciplinaEncontrada ? disciplinaEncontrada.id : null;
+    const disciplinaId = dados.disciplina; // ID vem direto
     
     const descEl = document.getElementById('horario-descricao');
     const descricaoValor = descEl ? descEl.value : '';
@@ -386,24 +388,35 @@ export const adicionarHorario = async (dados) => {
         
         document.getElementById('conteudo-principal').innerHTML = await obterConteudoDashboard();
         notificarSeguro('Horário publicado!', 'sucesso');
+        // Fecha o modal
+        const modalEl = document.getElementById('modal-novo-horario');
+        const modal = bootstrap.Modal.getInstance(modalEl);
+        if (modal) modal.hide();
+        
     } catch (e) { 
         console.error("Erro:", e); 
-        alert("Erro ao criar horário."); 
+        alert("Erro ao criar horário. Verifique os campos."); 
     }
 }
 
+// CORREÇÃO 3: Visual Hierárquico para o Professor (Matéria > Assunto)
 function gerarTabelaProfessor(dados) {
     const horariosLivres = dados.disponibilidades.filter(d => d.disponivel === true);
     const agendamentosPendentes = dados.agendamentos.filter(a => a.status === 'AGENDADO');
     const agendamentosConfirmados = dados.agendamentos.filter(a => a.status === 'CONFIRMADO');
+    const agendamentosConcluidos = dados.agendamentos.filter(a => a.status === 'CONCLUIDO');
 
     let html = '';
     
+    // 1. PEDIDOS PENDENTES
     if (agendamentosPendentes.length > 0) {
         html += `<tr class="table-warning"><td colspan="4" class="fw-bold text-dark"><i class="bi bi-exclamation-circle-fill me-2"></i> Pedidos Pendentes</td></tr>`;
         html += agendamentosPendentes.map(ag => `
             <tr>
-                <td><div class="fw-bold">${ag.disciplina_nome}</div><small>${ag.aluno_nome}</small></td>
+                <td>
+                    <div class="fw-bold text-primary">${ag.disciplina_nome} <i class="bi bi-chevron-right small"></i> ${ag.assunto || 'Geral'}</div>
+                    <small class="text-muted"><i class="bi bi-person"></i> ${ag.aluno_nome}</small>
+                </td>
                 <td>${formatarDataBr(ag.data)} - ${ag.hora.slice(0,5)}</td>
                 <td><span class="badge bg-warning text-dark">Pendente</span></td>
                 <td class="text-end">
@@ -413,11 +426,15 @@ function gerarTabelaProfessor(dados) {
             </tr>`).join('');
     }
 
+    // 2. AULAS CONFIRMADAS
     if (agendamentosConfirmados.length > 0) {
         html += `<tr class="table-success"><td colspan="4" class="fw-bold text-dark"><i class="bi bi-check-circle-fill me-2"></i> Aulas Confirmadas</td></tr>`;
         html += agendamentosConfirmados.map(ag => `
             <tr>
-                <td><div class="fw-bold">${ag.disciplina_nome}</div><small>${ag.aluno_nome}</small></td>
+                <td>
+                    <div class="fw-bold text-primary">${ag.disciplina_nome} <i class="bi bi-chevron-right small"></i> ${ag.assunto || 'Geral'}</div>
+                    <small class="text-muted"><i class="bi bi-person"></i> ${ag.aluno_nome}</small>
+                </td>
                 <td>${formatarDataBr(ag.data)} - ${ag.hora.slice(0,5)}</td>
                 <td><span class="badge bg-success">Confirmado</span></td>
                 <td class="text-end">
@@ -427,12 +444,50 @@ function gerarTabelaProfessor(dados) {
             </tr>`).join('');
     }
 
+    // 3. HISTÓRICO (CONCLUÍDAS)
+    if (agendamentosConcluidos.length > 0) {
+        html += `<tr class="table-secondary"><td colspan="4" class="fw-bold text-dark"><i class="bi bi-journal-check me-2"></i> Histórico de Aulas</td></tr>`;
+        html += agendamentosConcluidos.map(ag => {
+            let botaoAvaliacao = '';
+            
+            if (ag.avaliacao) {
+                botaoAvaliacao = `
+                    <button class="btn btn-sm btn-info text-white" 
+                            onclick="window.verAvaliacao(${ag.avaliacao.nota}, '${escapeHtml(ag.avaliacao.comentario)}', '${ag.aluno_nome}')">
+                        <i class="bi bi-eye-fill"></i> Ver Avaliação
+                    </button>`;
+            } else {
+                botaoAvaliacao = `
+                    <button class="btn btn-sm btn-warning" 
+                            onclick="window.abrirAvaliacao(${ag.id}, '${ag.aluno_nome}')">
+                        <i class="bi bi-star"></i> Avaliar Aluno
+                    </button>`;
+            }
+
+            return `
+            <tr>
+                <td>
+                    <div class="fw-bold text-primary">${ag.disciplina_nome} <i class="bi bi-chevron-right small"></i> ${ag.assunto || 'Geral'}</div>
+                    <small class="text-muted"><i class="bi bi-person"></i> ${ag.aluno_nome}</small>
+                </td>
+                <td>${formatarDataBr(ag.data)} - ${ag.hora.slice(0,5)}</td>
+                <td><span class="badge bg-secondary">Concluído</span></td>
+                <td class="text-end">
+                    ${botaoAvaliacao}
+                </td>
+            </tr>`;
+        }).join('');
+    }
+
+    // 4. HORÁRIOS LIVRES
     html += `<tr class="table-light"><td colspan="4" class="fw-bold text-muted"><i class="bi bi-calendar me-2"></i> Horários Livres</td></tr>`;
     
     if (horariosLivres.length === 0) html += `<tr><td colspan="4" class="text-center text-muted small py-2">Sem horários livres.</td></tr>`;
     else html += horariosLivres.map(item => `
         <tr>
-            <td><div class="fw-bold text-primary">${item.assunto || 'Livre'}</div><small>${item.disciplina_nome || 'Geral'}</small></td>
+            <td>
+                <div class="fw-bold text-primary">${item.disciplina_nome || 'Geral'} <i class="bi bi-chevron-right small"></i> ${item.assunto || 'Livre'}</div>
+            </td>
             <td>${formatarDataBr(item.data)} - ${item.horario_inicio.slice(0,5)}</td>
             <td><span class="badge bg-info text-dark">Disponível</span></td>
             <td class="text-end">

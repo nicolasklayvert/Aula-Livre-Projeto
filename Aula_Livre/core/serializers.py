@@ -44,7 +44,8 @@ class AvaliacaoSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Avaliacao
-        fields = ['id', 'agendamento', 'nota', 'comentario', 'criado_em', 'nome_aluno', 'nome_professor', 'disciplina_nome']
+        # ADICIONADO: 'tipo_avaliador' para saber se foi aluno ou professor
+        fields = ['id', 'agendamento', 'nota', 'comentario', 'tipo_avaliador', 'criado_em', 'nome_aluno', 'nome_professor', 'disciplina_nome']
 
 class AgendamentoSerializer(serializers.ModelSerializer):
     disciplina_nome = serializers.SerializerMethodField()
@@ -53,12 +54,15 @@ class AgendamentoSerializer(serializers.ModelSerializer):
     data = serializers.DateField(source='disponibilidade.data', read_only=True)
     hora = serializers.TimeField(source='disponibilidade.horario_inicio', read_only=True)
     
+    # Este campo estava definido mas faltava no Meta
+    assunto = serializers.ReadOnlyField(source='disponibilidade.assunto')
     link_aula = serializers.SerializerMethodField()
     avaliacao = serializers.SerializerMethodField()
 
     class Meta:
         model = Agendamento
-        fields = ['id', 'aluno', 'disponibilidade', 'disciplina_nome', 'professor_nome', 'aluno_nome', 'data', 'hora', 'status', 'link_aula', 'avaliacao']
+        # CORREÇÃO CRÍTICA AQUI: Adicionado 'assunto' na lista
+        fields = ['id', 'aluno', 'disponibilidade', 'disciplina_nome', 'professor_nome', 'aluno_nome', 'data', 'hora', 'status', 'assunto', 'link_aula', 'avaliacao']
         # Remove validação automática de duplicidade para permitir reativar agendamentos
         validators = []
 
@@ -99,6 +103,9 @@ class AgendamentoSerializer(serializers.ModelSerializer):
         return None
 
     def get_avaliacao(self, obj):
-        if hasattr(obj, 'avaliacao'):
-            return AvaliacaoSerializer(obj.avaliacao).data
+        # CORREÇÃO: Como mudou para ForeignKey, usa-se avaliacao_set
+        # Pega a primeira avaliação que encontrar (seja do aluno ou professor)
+        avaliacao = obj.avaliacao_set.first()
+        if avaliacao:
+            return AvaliacaoSerializer(avaliacao).data
         return None

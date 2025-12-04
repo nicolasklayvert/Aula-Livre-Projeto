@@ -102,7 +102,16 @@ class Certificado(models.Model):
         return f"Certificado {self.codigo_validacao}"
     
 class Avaliacao(models.Model):
-    agendamento = models.OneToOneField(Agendamento, on_delete=models.CASCADE)
+    # Mudamos de OneToOne para ForeignKey pro Agendamento aceitar notas dos dois lados
+    agendamento = models.ForeignKey(Agendamento, on_delete=models.CASCADE)
+    
+    # Campo novo pra saber quem está dando a nota
+    tipo_avaliador = models.CharField(
+        max_length=20, 
+        choices=[('ALUNO', 'Aluno'), ('PROFESSOR', 'Professor')],
+        default='ALUNO'
+    )
+    
     nota = models.IntegerField(choices=[(i, str(i)) for i in range(1, 6)])
     comentario = models.TextField(blank=True, null=True)
     criado_em = models.DateTimeField(auto_now_add=True)
@@ -110,6 +119,8 @@ class Avaliacao(models.Model):
     class Meta:
         verbose_name = "Avaliação"
         verbose_name_plural = "Avaliações"
+        # Regra pra evitar duplicidade: A mesma pessoa não pode avaliar a mesma aula 2x
+        unique_together = ('agendamento', 'tipo_avaliador')
 
     def __str__(self):
-        return f"Avaliação nota {self.nota} para {self.agendamento}"
+        return f"Avaliação de {self.tipo_avaliador} - Nota {self.nota}"

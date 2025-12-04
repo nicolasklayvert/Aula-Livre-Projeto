@@ -1,23 +1,23 @@
-// js/views/dashboard.js
-
 import { authService } from '../services/auth.js';
 
-// --- VARIAVEIS GLOBAIS ---
+// --- VARIÁVEIS GLOBAIS ---
 let acaoPendente = null;
 let idPendente = null;
 let modalConfirmacaoInstance = null;
-let tipoItemPendente = 'disponibilidade'; 
 let idAulaSendoAvaliada = null;
 
-// --- FUNCOES AUXILIARES ---
+// --- FUNÇÕES AUXILIARES ---
 function obterProximaData(nomeDiaSemana) {
     const dias = { 'Domingo': 0, 'Segunda': 1, 'Terça': 2, 'Quarta': 3, 'Quinta': 4, 'Sexta': 5, 'Sábado': 6 };
     const hoje = new Date();
     const diaDesejado = dias[nomeDiaSemana];
+    
     if (diaDesejado === undefined) return new Date().toISOString().split('T')[0];
+    
     let diaAtual = hoje.getDay();
     let distancia = diaDesejado - diaAtual;
     if (distancia <= 0) distancia += 7;
+    
     hoje.setDate(hoje.getDate() + distancia);
     return hoje.toISOString().split('T')[0]; 
 }
@@ -46,7 +46,9 @@ function getCookie(name) {
 function notificarSeguro(msg, tipo) {
     if (typeof window.mostrarNotificacao === 'function') {
         window.mostrarNotificacao(msg, tipo);
-    } else { alert(msg); }
+    } else { 
+        alert(msg); 
+    }
 }
 
 // --- API ---
@@ -60,39 +62,48 @@ async function buscarDisciplinas() {
 
 async function buscarMinhasAulas(usuario) {
     const timestamp = new Date().getTime();
+    const isProfessor = usuario.tipo === 'PROFESSOR' || usuario.tipo === 'professor';
+
     try {
-        if (usuario.tipo === 'professor') {
+        if (isProfessor) {
             const [respDisp, respAgend] = await Promise.all([
                 fetch(`/api/professores/${usuario.id}/?t=${timestamp}`),
                 fetch(`/api/agendamentos/?professor_id=${usuario.id}&t=${timestamp}`)
             ]);
+            
             let disponibilidades = [];
             let agendamentos = [];
+            
             if (respDisp.ok) {
                 const dados = await respDisp.json();
                 disponibilidades = dados.disponibilidades || [];
             }
             if (respAgend.ok) agendamentos = await respAgend.json();
+            
             return { disponibilidades, agendamentos };
         } else {
             const response = await fetch(`/api/agendamentos/?aluno_id=${usuario.id}&t=${timestamp}`);
             if (response.ok) return await response.json();
         }
     } catch (e) { console.error("Erro:", e); }
-    return usuario.tipo === 'professor' ? { disponibilidades: [], agendamentos: [] } : [];
+    
+    return isProfessor ? { disponibilidades: [], agendamentos: [] } : [];
 }
 
 // --- INTERFACE DE GERENCIAMENTO ---
-window.solicitarGerenciamento = function(id, acao, tipo = 'disponibilidade') {
+window.solicitarGerenciamento = function(id, acao) {
     acaoPendente = acao;
     idPendente = id;
-    tipoItemPendente = tipo;
     const txtConfirmacao = document.getElementById('texto-confirmacao');
     
-    if (acao === 'confirmar_agendamento') txtConfirmacao.innerText = 'Aceitar pedido de aula?';
-    else if (acao === 'rejeitar_agendamento') txtConfirmacao.innerText = 'Rejeitar este pedido?';
-    else if (acao === 'concluir_aula') txtConfirmacao.innerText = 'Finalizar aula? O aluno poderá avaliar.';
-    else if (acao === 'excluir') txtConfirmacao.innerText = 'Excluir este horário?';
+    const mensagens = {
+        'confirmar_agendamento': 'Aceitar pedido de aula?',
+        'rejeitar_agendamento': 'Rejeitar este pedido?',
+        'concluir_aula': 'Finalizar aula? O aluno poderá avaliar.',
+        'excluir': 'Excluir este horário?'
+    };
+
+    if (mensagens[acao]) txtConfirmacao.innerText = mensagens[acao];
 
     const modalEl = document.getElementById('modal-confirmacao');
     if (!modalConfirmacaoInstance) modalConfirmacaoInstance = new bootstrap.Modal(modalEl);
@@ -101,34 +112,50 @@ window.solicitarGerenciamento = function(id, acao, tipo = 'disponibilidade') {
 
 window.confirmarAcaoPendente = async function() {
     const headers = { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') };
+    let endpoint = '';
+    let method = 'PATCH';
+    let body = {};
+
     try {
-        if (acaoPendente === 'excluir') {
-            await fetch(`/api/disponibilidades/${idPendente}/`, { method: 'DELETE', headers });
-            notificarSeguro('Horário excluído.', 'sucesso');
-        } else if (acaoPendente === 'confirmar_agendamento') {
-            await fetch(`/api/agendamentos/${idPendente}/`, { method: 'PATCH', headers, body: JSON.stringify({ status: 'CONFIRMADO' }) });
-            notificarSeguro('Aula confirmada!', 'sucesso');
-        } else if (acaoPendente === 'rejeitar_agendamento') {
-            await fetch(`/api/agendamentos/${idPendente}/`, { method: 'PATCH', headers, body: JSON.stringify({ status: 'CANCELADO' }) });
-            notificarSeguro('Aula cancelada.', 'sucesso');
-        } else if (acaoPendente === 'concluir_aula') {
-            await fetch(`/api/agendamentos/${idPendente}/`, { method: 'PATCH', headers, body: JSON.stringify({ status: 'CONCLUIDO' }) });
-            notificarSeguro('Aula concluída!', 'sucesso');
+        switch (acaoPendente) {
+            case 'excluir':
+                endpoint = `/api/disponibilidades/${idPendente}/`;
+                method = 'DELETE';
+                body = null;
+                break;
+            case 'confirmar_agendamento':
+                endpoint = `/api/agendamentos/${idPendente}/`;
+                body = { status: 'CONFIRMADO' };
+                break;
+            case 'rejeitar_agendamento':
+                endpoint = `/api/agendamentos/${idPendente}/`;
+                body = { status: 'CANCELADO' };
+                break;
+            case 'concluir_aula':
+                endpoint = `/api/agendamentos/${idPendente}/`;
+                body = { status: 'CONCLUIDO' };
+                break;
         }
+
+        const options = { method, headers };
+        if (body) options.body = JSON.stringify(body);
+
+        await fetch(endpoint, options);
+        notificarSeguro('Operação realizada com sucesso!', 'sucesso');
+        
         const novoConteudo = await obterConteudoDashboard();
         document.getElementById('conteudo-principal').innerHTML = novoConteudo;
+
     } catch (e) {
         notificarSeguro('Erro na operação.', 'erro');
         console.error(e);
     }
+    
     if (modalConfirmacaoInstance) modalConfirmacaoInstance.hide();
 }
 
-// --- LÓGICA DE AVALIAÇÃO (AGORA COM MODO LEITURA) ---
-
-// 1. Função visual das estrelas
+// --- AVALIAÇÃO ---
 window.selecionarEstrela = function(nota) {
-    // Se o campo estiver desabilitado (modo leitura), não faz nada
     if (document.getElementById('nota-final').disabled) return;
 
     const inputNota = document.getElementById('nota-final');
@@ -147,36 +174,31 @@ window.selecionarEstrela = function(nota) {
     });
 };
 
-// 2. Abre modal para NOVA avaliação
 window.abrirAvaliacao = function(idAgendamento, nomeProfessor) {
     idAulaSendoAvaliada = idAgendamento;
     
-    // Configura Visual para Edição
     document.getElementById('nome-avaliado').innerText = nomeProfessor;
     
     const inputNota = document.getElementById('nota-final');
     inputNota.value = "0";
-    inputNota.disabled = false; // Habilita edição
+    inputNota.disabled = false;
 
     const textarea = document.querySelector('#form-avaliacao textarea');
     textarea.value = "";
-    textarea.disabled = false; // Habilita edição
+    textarea.disabled = false;
     textarea.placeholder = "O que você achou da didática?";
 
-    // Reseta estrelas
     const estrelas = document.querySelectorAll('.estrela-interativa');
     estrelas.forEach(e => {
         e.classList.remove('bi-star-fill', 'text-warning');
         e.classList.add('bi-star');
-        e.style.cursor = 'pointer'; // Mostra que pode clicar
+        e.style.cursor = 'pointer';
     });
 
-    // Mostra botão de enviar
     const btnSubmit = document.querySelector('#form-avaliacao button[type="submit"]');
     btnSubmit.style.display = 'block';
     btnSubmit.innerText = 'Enviar Avaliação';
 
-    // Intercepta envio
     const form = document.getElementById('form-avaliacao');
     form.onsubmit = function(event) {
         event.preventDefault();
@@ -186,19 +208,17 @@ window.abrirAvaliacao = function(idAgendamento, nomeProfessor) {
     new bootstrap.Modal(document.getElementById('modal-avaliacao')).show();
 };
 
-// 3. Abre modal para VER avaliação existente (Modo Leitura)
 window.verAvaliacao = function(nota, comentario, nomeProfessor) {
     document.getElementById('nome-avaliado').innerText = nomeProfessor + " (Feita)";
 
     const inputNota = document.getElementById('nota-final');
     inputNota.value = nota;
-    inputNota.disabled = true; // Bloqueia
+    inputNota.disabled = true;
 
     const textarea = document.querySelector('#form-avaliacao textarea');
     textarea.value = comentario || "Sem comentários.";
-    textarea.disabled = true; // Bloqueia
+    textarea.disabled = true;
 
-    // Pinta estrelas e bloqueia clique
     const estrelas = document.querySelectorAll('.estrela-interativa');
     estrelas.forEach(estrela => {
         const valor = parseInt(estrela.getAttribute('data-nota'));
@@ -212,14 +232,12 @@ window.verAvaliacao = function(nota, comentario, nomeProfessor) {
         }
     });
 
-    // Esconde botão de enviar
     const btnSubmit = document.querySelector('#form-avaliacao button[type="submit"]');
     btnSubmit.style.display = 'none';
 
     new bootstrap.Modal(document.getElementById('modal-avaliacao')).show();
 };
 
-// 4. Envia dados
 window.enviarAvaliacao = async function() {
     const nota = document.getElementById('nota-final').value;
     const comentario = document.querySelector('#form-avaliacao textarea').value;
@@ -239,7 +257,6 @@ window.enviarAvaliacao = async function() {
         if (response.ok) {
             notificarSeguro('Avaliação enviada!', 'sucesso');
             bootstrap.Modal.getInstance(document.getElementById('modal-avaliacao')).hide();
-            // Atualiza a tabela para mudar o botão para "Ver"
             document.getElementById('conteudo-principal').innerHTML = await obterConteudoDashboard();
         } else {
             alert("Erro ao salvar avaliação.");
@@ -257,7 +274,6 @@ window.verCertificado = function(nomePessoa, materia) {
 
 // --- RENDERIZADORES ---
 
-// Função auxiliar para escapar aspas e evitar erro no HTML onclick
 function escapeHtml(text) {
     if (!text) return "";
     return text.replace(/'/g, "\\'").replace(/"/g, '&quot;');
@@ -279,18 +295,14 @@ function gerarTabelaAluno(listaAgendamentos) {
         } else if (aula.status === 'CONCLUIDO') {
             statusBadge = '<span class="badge bg-success">Concluído</span>';
             
-            // SE TIVER AVALIAÇÃO, MUDA O BOTÃO
             let botaoAvaliacao = '';
             if (aula.avaliacao) {
-                // Já avaliou: Botão Azul (Ver)
-                // Usamos escapeHtml para evitar bugs se o comentario tiver aspas
                 botaoAvaliacao = `
                     <button class="btn btn-sm btn-info text-white me-1" 
                             onclick="window.verAvaliacao(${aula.avaliacao.nota}, '${escapeHtml(aula.avaliacao.comentario)}', '${aula.professor_nome}')">
                         <i class="bi bi-eye-fill"></i> Ver Avaliação
                     </button>`;
             } else {
-                // Não avaliou: Botão Amarelo (Avaliar)
                 botaoAvaliacao = `
                     <button class="btn btn-sm btn-warning me-1" 
                             onclick="window.abrirAvaliacao(${aula.id}, '${aula.professor_nome}')">
@@ -320,13 +332,14 @@ function gerarTabelaAluno(listaAgendamentos) {
     }).join('');
 }
 
-// --- REPETINDO FUNÇÕES DO PROFESSOR PARA O ARQUIVO FICAR COMPLETO ---
 export async function atualizarSelectDoModal() {
     const select = document.getElementById('horario-disciplina');
     if (!select) return;
+    
     select.innerHTML = '<option disabled selected>Carregando...</option>';
     const disciplinas = await buscarDisciplinas();
     select.innerHTML = ''; 
+    
     if (disciplinas.length === 0) select.innerHTML = '<option disabled>Nenhuma disciplina</option>';
     else disciplinas.forEach(disc => {
         const option = document.createElement('option');
@@ -340,29 +353,43 @@ window.abrirModalNovoHorario = function() {
     new bootstrap.Modal(document.getElementById('modal-novo-horario')).show();
 }
 
-export const adicionarHorarioMock = async (dados) => {
+// Renomeado para refletir que faz um POST real
+export const adicionarHorario = async (dados) => {
     const usuario = authService.getUsuario();
     const todasDisciplinas = await buscarDisciplinas();
     const disciplinaEncontrada = todasDisciplinas.find(d => d.nome === dados.disciplina);
     const disciplinaId = disciplinaEncontrada ? disciplinaEncontrada.id : null;
+    
     const descEl = document.getElementById('horario-descricao');
     const descricaoValor = descEl ? descEl.value : '';
 
     const payload = {
-        professor: usuario.id, disciplina: disciplinaId,
-        assunto: dados.assunto, nivel: dados.nivel, descricao: descricaoValor,
-        link: dados.link, data: obterProximaData(dados.dia), horario_inicio: dados.hora,
+        professor: usuario.id, 
+        disciplina: disciplinaId,
+        assunto: dados.assunto, 
+        nivel: dados.nivel, 
+        descricao: descricaoValor,
+        link: dados.link, 
+        data: obterProximaData(dados.dia), 
+        horario_inicio: dados.hora,
         disponivel: true
     };
+
     try {
         const response = await fetch('/api/disponibilidades/', {
-            method: 'POST', headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') },
+            method: 'POST', 
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') },
             body: JSON.stringify(payload)
         });
+        
         if (!response.ok) throw new Error("Falha");
+        
         document.getElementById('conteudo-principal').innerHTML = await obterConteudoDashboard();
         notificarSeguro('Horário publicado!', 'sucesso');
-    } catch (e) { console.error("Erro:", e); alert("Erro ao criar horário."); }
+    } catch (e) { 
+        console.error("Erro:", e); 
+        alert("Erro ao criar horário."); 
+    }
 }
 
 function gerarTabelaProfessor(dados) {
@@ -371,34 +398,125 @@ function gerarTabelaProfessor(dados) {
     const agendamentosConfirmados = dados.agendamentos.filter(a => a.status === 'CONFIRMADO');
 
     let html = '';
+    
     if (agendamentosPendentes.length > 0) {
         html += `<tr class="table-warning"><td colspan="4" class="fw-bold text-dark"><i class="bi bi-exclamation-circle-fill me-2"></i> Pedidos Pendentes</td></tr>`;
-        html += agendamentosPendentes.map(ag => `<tr><td><div class="fw-bold">${ag.disciplina_nome}</div><small>${ag.aluno_nome}</small></td><td>${formatarDataBr(ag.data)} - ${ag.hora.slice(0,5)}</td><td><span class="badge bg-warning text-dark">Pendente</span></td><td class="text-end"><button class="btn btn-sm btn-success me-1" onclick="window.solicitarGerenciamento(${ag.id}, 'confirmar_agendamento', 'agendamento')">Aceitar</button><button class="btn btn-sm btn-danger" onclick="window.solicitarGerenciamento(${ag.id}, 'rejeitar_agendamento', 'agendamento')">Rejeitar</button></td></tr>`).join('');
+        html += agendamentosPendentes.map(ag => `
+            <tr>
+                <td><div class="fw-bold">${ag.disciplina_nome}</div><small>${ag.aluno_nome}</small></td>
+                <td>${formatarDataBr(ag.data)} - ${ag.hora.slice(0,5)}</td>
+                <td><span class="badge bg-warning text-dark">Pendente</span></td>
+                <td class="text-end">
+                    <button class="btn btn-sm btn-success me-1" onclick="window.solicitarGerenciamento(${ag.id}, 'confirmar_agendamento')">Aceitar</button>
+                    <button class="btn btn-sm btn-danger" onclick="window.solicitarGerenciamento(${ag.id}, 'rejeitar_agendamento')">Rejeitar</button>
+                </td>
+            </tr>`).join('');
     }
+
     if (agendamentosConfirmados.length > 0) {
         html += `<tr class="table-success"><td colspan="4" class="fw-bold text-dark"><i class="bi bi-check-circle-fill me-2"></i> Aulas Confirmadas</td></tr>`;
-        html += agendamentosConfirmados.map(ag => `<tr><td><div class="fw-bold">${ag.disciplina_nome}</div><small>${ag.aluno_nome}</small></td><td>${formatarDataBr(ag.data)} - ${ag.hora.slice(0,5)}</td><td><span class="badge bg-success">Confirmado</span></td><td class="text-end"><button class="btn btn-sm btn-success me-1" onclick="window.solicitarGerenciamento(${ag.id}, 'concluir_aula', 'agendamento')">Concluir</button><button class="btn btn-sm btn-outline-danger" onclick="window.solicitarGerenciamento(${ag.id}, 'rejeitar_agendamento', 'agendamento')">Cancelar</button></td></tr>`).join('');
+        html += agendamentosConfirmados.map(ag => `
+            <tr>
+                <td><div class="fw-bold">${ag.disciplina_nome}</div><small>${ag.aluno_nome}</small></td>
+                <td>${formatarDataBr(ag.data)} - ${ag.hora.slice(0,5)}</td>
+                <td><span class="badge bg-success">Confirmado</span></td>
+                <td class="text-end">
+                    <button class="btn btn-sm btn-success me-1" onclick="window.solicitarGerenciamento(${ag.id}, 'concluir_aula')">Concluir</button>
+                    <button class="btn btn-sm btn-outline-danger" onclick="window.solicitarGerenciamento(${ag.id}, 'rejeitar_agendamento')">Cancelar</button>
+                </td>
+            </tr>`).join('');
     }
+
     html += `<tr class="table-light"><td colspan="4" class="fw-bold text-muted"><i class="bi bi-calendar me-2"></i> Horários Livres</td></tr>`;
+    
     if (horariosLivres.length === 0) html += `<tr><td colspan="4" class="text-center text-muted small py-2">Sem horários livres.</td></tr>`;
-    else html += horariosLivres.map(item => `<tr><td><div class="fw-bold text-primary">${item.assunto || 'Livre'}</div><small>${item.disciplina_nome || 'Geral'}</small></td><td>${formatarDataBr(item.data)} - ${item.horario_inicio.slice(0,5)}</td><td><span class="badge bg-info text-dark">Disponível</span></td><td class="text-end"><button class="btn btn-sm btn-outline-danger" onclick="window.solicitarGerenciamento(${item.id}, 'excluir', 'disponibilidade')"><i class="bi bi-trash"></i></button></td></tr>`).join('');
+    else html += horariosLivres.map(item => `
+        <tr>
+            <td><div class="fw-bold text-primary">${item.assunto || 'Livre'}</div><small>${item.disciplina_nome || 'Geral'}</small></td>
+            <td>${formatarDataBr(item.data)} - ${item.horario_inicio.slice(0,5)}</td>
+            <td><span class="badge bg-info text-dark">Disponível</span></td>
+            <td class="text-end">
+                <button class="btn btn-sm btn-outline-danger" onclick="window.solicitarGerenciamento(${item.id}, 'excluir')"><i class="bi bi-trash"></i></button>
+            </td>
+        </tr>`).join('');
+        
     return html;
 }
 
 async function renderPainelProfessor(usuario) {
     const dados = await buscarMinhasAulas(usuario);
-    return `<div class="container py-5"><div class="row mb-4 align-items-center"><div class="col"><h2 class="fw-bold text-primary">Painel do Professor</h2><p class="text-muted">Bem vindo, ${usuario.nome}!</p></div><div class="col-auto"><button class="btn botao-verde" onclick="window.abrirModalNovoHorario()">Novo Horário</button></div></div><div class="card border-0 shadow-sm"><div class="card-body p-0"><div class="table-responsive"><table class="table table-hover align-middle mb-0"><thead class="bg-light"><tr><th class="ps-4">Conteúdo</th><th>Dia/Hora</th><th>Status</th><th class="text-end pe-4">Ação</th></tr></thead><tbody class="ps-4">${gerarTabelaProfessor(dados)}</tbody></table></div></div></div></div>`;
+    return `
+    <div class="container py-5">
+        <div class="row mb-4 align-items-center">
+            <div class="col">
+                <h2 class="fw-bold text-primary">Painel do Professor</h2>
+                <p class="text-muted">Bem vindo, ${usuario.nome}!</p>
+            </div>
+            <div class="col-auto">
+                <button class="btn botao-verde" onclick="window.abrirModalNovoHorario()">Novo Horário</button>
+            </div>
+        </div>
+        <div class="card border-0 shadow-sm">
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="bg-light">
+                            <tr>
+                                <th class="ps-4">Conteúdo</th>
+                                <th>Dia/Hora</th>
+                                <th>Status</th>
+                                <th class="text-end pe-4">Ação</th>
+                            </tr>
+                        </thead>
+                        <tbody class="ps-4">
+                            ${gerarTabelaProfessor(dados)}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>`;
 }
 
 async function renderPainelAluno(usuario) {
     const listaAgendamentos = await buscarMinhasAulas(usuario);
-    return `<div class="container py-5"><div class="row mb-4 align-items-center"><div class="col"><h2 class="fw-bold text-primary">Área do Aluno</h2><p class="text-muted">Bons estudos, ${usuario.nome}!</p></div><div class="col-auto"><button class="btn botao-verde" data-route="explorar">Buscar Professor</button></div></div><div class="card border-0 shadow-sm"><div class="card-body p-0"><div class="table-responsive"><table class="table table-hover align-middle mb-0"><thead class="bg-light"><tr><th class="ps-4">Matéria</th><th>Data</th><th>Status</th><th class="text-center">Avaliação</th><th class="text-end pe-4">Acesso</th></tr></thead><tbody class="ps-4">${gerarTabelaAluno(listaAgendamentos)}</tbody></table></div></div></div></div>`;
+    return `
+    <div class="container py-5">
+        <div class="row mb-4 align-items-center">
+            <div class="col">
+                <h2 class="fw-bold text-primary">Área do Aluno</h2>
+                <p class="text-muted">Bons estudos, ${usuario.nome}!</p>
+            </div>
+            <div class="col-auto">
+                <button class="btn botao-verde" data-route="explorar">Buscar Professor</button>
+            </div>
+        </div>
+        <div class="card border-0 shadow-sm">
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="bg-light">
+                            <tr>
+                                <th class="ps-4">Matéria</th>
+                                <th>Data</th>
+                                <th>Status</th>
+                                <th class="text-center">Avaliação</th>
+                                <th class="text-end pe-4">Acesso</th>
+                            </tr>
+                        </thead>
+                        <tbody class="ps-4">
+                            ${gerarTabelaAluno(listaAgendamentos)}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>`;
 }
 
 export async function obterConteudoDashboard() {
     const usuario = authService.getUsuario();
     if (!usuario) return '';
-    return (usuario.tipo === 'professor') ? await renderPainelProfessor(usuario) : await renderPainelAluno(usuario);
+    const isProfessor = usuario.tipo === 'PROFESSOR' || usuario.tipo === 'professor';
+    return isProfessor ? await renderPainelProfessor(usuario) : await renderPainelAluno(usuario);
 }
-
-export function salvarDisciplinasSelecionadas() {}

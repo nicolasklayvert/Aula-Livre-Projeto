@@ -1,11 +1,8 @@
-// js/views/explorar.js
-
 import { authService } from '../services/auth.js';
 
 // Inicializa a lista global
 window.listaDeProfessores = [];
 
-// Função auxiliar para pegar o CSRF Token (necessário para POST no Django)
 function getCookie(name) {
     let cookieValue = null;
     if (document.cookie && document.cookie !== '') {
@@ -36,14 +33,15 @@ window.abrirModalAgendamento = function(id) {
     const divHorarios = document.getElementById('lista-horarios');
     divHorarios.innerHTML = ''; 
 
-    if (professor.horarios.length === 0) {
+    const horariosDisponiveis = professor.horarios.filter(h => h.disponivel !== false);
+
+    if (horariosDisponiveis.length === 0) {
         divHorarios.innerHTML = '<p class="text-muted text-center">Sem horários livres no momento.</p>';
     } else {
-        professor.horarios.forEach(item => {
+        horariosDisponiveis.forEach(item => {
             const card = document.createElement('div');
             card.className = 'card mb-3 border-primary';
             
-            // Note que adicionei item.id na chamada da função abaixo
             card.innerHTML = `
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-start mb-2">
@@ -80,21 +78,17 @@ window.abrirModalAgendamento = function(id) {
     modalBootstrap.show();
 }
 
-// --- FUNÇÃO DE AGENDAMENTO REAL (ATUALIZADA) ---
 window.confirmarAgendamentoReal = async function(idDisponibilidade, nomeProf, data, hora) {
     const usuario = authService.getUsuario();
     if (!usuario) return;
 
-    // 1. Prepara os dados para o Backend
     const payload = {
         aluno: usuario.id,
         disponibilidade: idDisponibilidade,
-        // O status padrão já é 'AGENDADO' no modelo, mas podemos reforçar
         status: 'AGENDADO'
     };
 
     try {
-        // 2. Faz a requisição POST para salvar no banco
         const response = await fetch('/api/agendamentos/', {
             method: 'POST',
             headers: {
@@ -105,11 +99,11 @@ window.confirmarAgendamentoReal = async function(idDisponibilidade, nomeProf, da
         });
 
         if (response.ok) {
-            // 3. Sucesso: Fecha modal e avisa
             const modalElemento = document.getElementById('modal-agendamento');
             const modalInstance = bootstrap.Modal.getInstance(modalElemento);
             modalInstance.hide();
 
+            // Notificação de Sucesso
             const toastEl = document.getElementById('toast-sistema');
             const toastMsg = document.getElementById('toast-mensagem');
             const toastIcone = document.getElementById('toast-icone');
@@ -121,15 +115,13 @@ window.confirmarAgendamentoReal = async function(idDisponibilidade, nomeProf, da
             const toastBootstrap = new bootstrap.Toast(toastEl);
             toastBootstrap.show();
 
-            // Opcional: Recarregar a lista de professores para atualizar a disponibilidade (se ela sumir após agendar)
-            obterConteudoExplorar().then(html => {
-               // Se quisesse atualizar a tela na hora...
-            });
+            // Atualiza a lista em segundo plano
+            obterConteudoExplorar();
 
         } else {
             const erro = await response.json();
             console.error(erro);
-            alert("Erro ao agendar: " + JSON.stringify(erro));
+            alert("Erro ao agendar: " + (erro.detail || "Verifique os dados."));
         }
 
     } catch (error) {
@@ -182,7 +174,6 @@ export async function obterConteudoExplorar() {
 
     try {
         const timestamp = new Date().getTime();
-        // Filtramos para trazer apenas quem tem horários, se quiser, ou trazemos tudo
         const response = await fetch(`/api/professores/?t=${timestamp}`);
         const dadosApi = await response.json();
 
@@ -191,9 +182,6 @@ export async function obterConteudoExplorar() {
             
             const listaHorarios = prof.disponibilidades 
                 ? prof.disponibilidades.map(d => {
-                    // Filtro visual: Se a disponibilidade já não estiver "disponivel", você pode querer esconder aqui
-                    // Mas vamos deixar aparecer tudo por enquanto.
-                    
                     const partesData = d.data.split('-'); 
                     const dia = partesData[2];
                     const mes = partesData[1];
@@ -205,14 +193,15 @@ export async function obterConteudoExplorar() {
                     }
 
                     return {
-                        id: d.id, // ID REAL da Disponibilidade
+                        id: d.id, 
                         disciplina: nomeDisc,
                         assunto: d.assunto,
                         nivel: d.nivel,
                         descricao: d.descricao,
                         hora: hora,
                         dataFormatada: `${dia}/${mes}`,
-                        dataExtenso: `${dia}/${mes}`
+                        dataExtenso: `${dia}/${mes}`,
+                        disponivel: d.disponivel
                     };
                   }) 
                 : []; 

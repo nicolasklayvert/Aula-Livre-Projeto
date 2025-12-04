@@ -3,7 +3,6 @@
 const CHAVE_USUARIO = 'aulalivre_usuario';
 const API_BASE_URL = '/api'; 
 
-// 1. A função fica aqui fora, ANTES do export
 function getCookie(name) {
     let cookieValue = null;
     if (document.cookie && document.cookie !== '') {
@@ -21,7 +20,6 @@ function getCookie(name) {
 
 export const authService = {
     
-    // 2. Aqui começa o objeto
     logar: async (email, senha) => {
         try {
             const response = await fetch(`${API_BASE_URL}/login/`, {
@@ -31,7 +29,7 @@ export const authService = {
                     'X-CSRFToken': getCookie('csrftoken') 
                 },
                 body: JSON.stringify({ email, senha })
-            }); // Corrigido: Ponto e vírgula aqui.
+            });
 
             if (response.ok) {
                 const dados = await response.json();
@@ -55,8 +53,14 @@ export const authService = {
                     'Content-Type': 'application/json',
                     'X-CSRFToken': getCookie('csrftoken')
                 },
-                body: JSON.stringify({ nome, email, senha, tipo })
-            }); // Corrigido: Ponto e vírgula aqui.
+                // Garante que o tipo seja enviado em maiúsculo para bater com o banco de dados (ALUNO/PROFESSOR)
+                body: JSON.stringify({ 
+                    nome, 
+                    email, 
+                    senha, 
+                    tipo: tipo.toUpperCase() 
+                })
+            });
 
             if (response.ok) {
                 const dados = await response.json();

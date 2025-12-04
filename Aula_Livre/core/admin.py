@@ -1,10 +1,21 @@
 from django.contrib import admin
-from .models import Professor, Aluno, Disciplina, Disponibilidade, Agendamento, Avaliacao
+from django.contrib.auth.admin import UserAdmin
+from .models import Usuario, Disciplina, Disponibilidade, Agendamento, Avaliacao, Certificado
 
-# Isso permite gerenciar esses dados em http://127.0.0.1:8000/admin
-admin.site.register(Professor)
-admin.site.register(Aluno)
+class UsuarioAdmin(UserAdmin):
+    # Configuração para exibir os campos customizados 'tipo' e 'nome' no Admin
+    fieldsets = UserAdmin.fieldsets + (
+        ('Informações Personalizadas', {'fields': ('tipo', 'nome')}),
+    )
+    add_fieldsets = UserAdmin.add_fieldsets + (
+        (None, {'fields': ('tipo', 'nome', 'email')}),
+    )
+    list_display = ['username', 'email', 'nome', 'tipo', 'is_staff']
+    search_fields = ['nome', 'email', 'username']
+
+admin.site.register(Usuario, UsuarioAdmin)
 admin.site.register(Disciplina)
 admin.site.register(Disponibilidade)
 admin.site.register(Agendamento)
 admin.site.register(Avaliacao)
+admin.site.register(Certificado)

@@ -20,7 +20,6 @@ class Usuario(AbstractUser):
 class Disciplina(models.Model):
     nome = models.CharField(max_length=50)
     descricao = models.TextField(blank=True, null=True)
-    # CORREÇÃO AQUI: adicionado blank=True para tornar o campo opcional no cadastro
     professores = models.ManyToManyField(
         Usuario, 
         related_name='disciplinas', 
@@ -37,6 +36,7 @@ class Disponibilidade(models.Model):
     assunto = models.CharField(max_length=100, blank=True, null=True)
     nivel = models.CharField(max_length=50, blank=True, null=True)
     descricao = models.TextField(blank=True, null=True)
+    # O campo link já existia aqui, viu? Você que não tinha visto.
     link = models.URLField(max_length=200, blank=True, null=True)
     
     data = models.DateField()
@@ -70,7 +70,15 @@ class Agendamento(models.Model):
             if not self.disponibilidade.disponivel:
                 raise ValidationError("Este horário já foi reservado por outro aluno.")
             
+            # Trava o horário
             self.disponibilidade.disponivel = False
+            
+            # --- A MÁGICA DO CLEBS AQUI ---
+            # Se não tiver link, cria um link do Jitsi usando o ID da disponibilidade
+            if not self.disponibilidade.link:
+                self.disponibilidade.link = f"https://meet.jit.si/AulaLivre-{self.disponibilidade.id}"
+            
+            # Salva a disponibilidade com o link novo e travada
             self.disponibilidade.save()
 
         # Libera o horário se cancelado

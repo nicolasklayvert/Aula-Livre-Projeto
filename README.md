@@ -37,3 +37,46 @@ A AulaLivre é uma plataforma de ensino voluntário desenvolvida com uma arquite
 * **`static/js/router.js`:** Controla a navegação SPA e implementa o *gatekeeping* para rotas protegidas que exigem autenticação.
 * **`static/js/services/auth.js`:** Camada de serviço responsável pela comunicação com as APIs de login e cadastro, e pela persistência do estado do usuário no `localStorage`.
 * **`static/js/views/*.js`:** Módulos que retornam o conteúdo HTML e contêm a lógica específica de cada tela (Home, Explorar, Dashboard).
+
+---
+
+## 4. Configuração Inicial e Primeiros Passos
+
+Para rodar a aplicação localmente e garantir o funcionamento correto das APIs de agendamento, siga os passos abaixo:
+
+### 4.1. Configuração do Ambiente
+
+1.  **Instalação de Dependências:**
+    ```bash
+    pip install -r requirements.txt
+    ```
+2.  **Executar Migrações:** Aplique as mudanças do modelo ao banco de dados SQLite:
+    ```bash
+    python manage.py makemigrations core
+    python manage.py migrate
+    ```
+
+### 4.2. Inserção de Dados Iniciais (CRÍTICO)
+
+O sistema depende da existência de disciplinas no banco de dados para que professores possam se cadastrar e criar horários.
+
+1.  **Criação do Usuário Administrador (Admin):**
+    ```bash
+    python manage.py createsuperuser
+    ```
+    *Guarde o e-mail e a senha, pois este será seu primeiro login.*
+
+2.  **Populando Disciplinas:**
+    * Inicie o servidor localmente: `python manage.py runserver`
+    * Acesse o painel de administração do Django (`http://127.0.0.1:8000/admin`).
+    * Faça login com o superusuário criado.
+    * Vá até a seção **CORE** e clique em **Disciplinas**.
+    * **Adicione manualmente** as disciplinas que serão usadas na plataforma (ex: "Matemática", "Português", "Física", "Química", etc.).
+
+### 4.3. Iniciar a Aplicação
+
+1.  **Iniciar o Servidor:**
+    ```bash
+    python manage.py runserver
+    ```
+2.  Acesse o frontend em `http://127.0.0.1:8000/`.

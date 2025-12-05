@@ -10,18 +10,23 @@ const rotas = {
     'dashboard': obterConteudoDashboard
 };
 
+// Define quais rotas exigem login
 const rotasProtegidas = ['dashboard'];
 
 async function navegar(rota) {
-    // Verificação de segurança para rotas protegidas
+    // --- LÓGICA DE SEGURANÇA ---
+    // Se a rota for protegida E o usuário NÃO estiver logado:
     if (rotasProtegidas.includes(rota) && !authService.usuarioEstaLogado()) {
         window.mostrarNotificacao('Você precisa fazer login para acessar essa página.', 'erro');
-        navegar('home');
+        navegar('home'); // Redireciona para home
         
+        // Abre o modal de login automaticamente para facilitar
         const modalEl = document.getElementById('modal-entrar');
-        const modal = new bootstrap.Modal(modalEl);
-        modal.show();
-        return;
+        if (modalEl) {
+            const modal = new bootstrap.Modal(modalEl);
+            modal.show();
+        }
+        return; // Interrompe a execução aqui (não renderiza o dashboard)
     }
 
     const app = document.getElementById('conteudo-principal');
@@ -267,16 +272,49 @@ function configurarDisciplinas() {
     });
 }
 
+// --- ATUALIZAÇÃO DO LOGOUT ---
 function configurarLogout() {
     const btnLogout = document.getElementById('btn-logout');
     if (btnLogout) {
-        btnLogout.addEventListener('click', () => {
+        // Transformamos a função em ASYNC
+        btnLogout.addEventListener('click', async () => {
+            
+     
+            try {
+                
+                await fetch('/api/logout/', { 
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': getCookie('csrftoken') // Pega o token se possível
+                    }
+                });
+            } catch (error) {
+                console.error("Erro ao fazer logout no servidor:", error);
+            }
+
+            // 2. Limpa o Frontend independente do resultado do servidor
             authService.deslogar();
             atualizarNavbar();
             window.mostrarNotificacao('Você saiu.', 'sucesso');
             navegar('home');
         });
     }
+}
+
+// Pequena função auxiliar caso não tenha importado
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
 }
 
 // --- INICIALIZAÇÃO ---

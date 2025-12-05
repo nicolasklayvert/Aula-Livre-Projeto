@@ -1,6 +1,8 @@
 from rest_framework import viewsets, status
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated 
+from django.contrib.auth import login, logout             
 from .models import Disciplina, Agendamento, Avaliacao, Usuario, Disponibilidade
 from .serializers import (
     DisciplinaSerializer, 
@@ -10,12 +12,12 @@ from .serializers import (
     DisponibilidadeSerializer
 )
 
-# ViewSet para Gerenciar Disciplinas (Aqui você cria: Matemática, História, etc.)
+# ViewSet para Gerenciar Disciplinas
 class DisciplinaViewSet(viewsets.ModelViewSet):
     queryset = Disciplina.objects.all()
     serializer_class = DisciplinaSerializer
 
-# ViewSet genérico para Usuários (Admins, Alunos e Professores)
+# ViewSet genérico para Usuários (Ver todos)
 class UsuarioViewSet(viewsets.ModelViewSet):
     queryset = Usuario.objects.all()
     serializer_class = UsuarioSerializer
@@ -25,6 +27,13 @@ class ProfessorViewSet(viewsets.ModelViewSet):
     queryset = Usuario.objects.filter(tipo='PROFESSOR')
     serializer_class = UsuarioSerializer
 
+
+class AlunoViewSet(viewsets.ModelViewSet):
+    queryset = Usuario.objects.filter(tipo='ALUNO')
+    serializer_class = UsuarioSerializer
+    permission_classes = [IsAuthenticated] 
+
+
 class DisponibilidadeViewSet(viewsets.ModelViewSet):
     queryset = Disponibilidade.objects.all()
     serializer_class = DisponibilidadeSerializer
@@ -32,12 +41,9 @@ class DisponibilidadeViewSet(viewsets.ModelViewSet):
 class AgendamentoViewSet(viewsets.ModelViewSet):
     queryset = Agendamento.objects.all()
     serializer_class = AgendamentoSerializer
+    permission_classes = [IsAuthenticated]
     
     def get_queryset(self):
-        """
-        Permite filtrar agendamentos por aluno ou professor via URL
-        Ex: /api/agendamentos/?aluno_id=1
-        """
         queryset = Agendamento.objects.all()
         aluno_id = self.request.query_params.get('aluno_id')
         prof_id = self.request.query_params.get('professor_id')
@@ -52,22 +58,16 @@ class AgendamentoViewSet(viewsets.ModelViewSet):
 class AvaliacaoViewSet(viewsets.ModelViewSet):
     queryset = Avaliacao.objects.all()
     serializer_class = AvaliacaoSerializer
+    permission_classes = [IsAuthenticated]
 
 # --- VIEWS DE AUTENTICAÇÃO E CADASTRO ---
 
 @api_view(['POST'])
 def cadastro_usuario(request):
-    """
-    Endpoint dedicado ao cadastro (Signup).
-    Usa o UsuarioSerializer corrigido para tratar a senha.
-    """
     serializer = UsuarioSerializer(data=request.data)
         
     if serializer.is_valid():
-        # O método .save() vai chamar o create() do Serializer, 
-        # que agora criptografa a senha corretamente.
         user = serializer.save()
-        
         return Response({
             'id': user.id,
             'nome': user.nome,
@@ -79,16 +79,14 @@ def cadastro_usuario(request):
 
 @api_view(['POST'])
 def login_usuario(request):
-    """
-    Endpoint simples de Login.
-    """
     email = request.data.get('email')
     senha = request.data.get('senha')
     
     try:
         user = Usuario.objects.get(email=email)
-        # check_password funciona porque usamos set_password no cadastro
+        
         if user.check_password(senha):
+            login(request, user) 
             return Response({
                 'id': user.id,
                 'nome': user.nome,
@@ -100,3 +98,8 @@ def login_usuario(request):
             
     except Usuario.DoesNotExist:
         return Response({'detail': 'Usuário não encontrado.'}, status=status.HTTP_401_UNAUTHORIZED)
+
+@api_view(['POST'])
+def logout_usuario(request):
+    logout(request)
+    return Response({'detail': 'Logout realizado com sucesso.'}, status=status.HTTP_200_OK)
